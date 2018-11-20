@@ -43,10 +43,10 @@ class Model_madry(object):
 
     self.pre_softmax = tf.matmul(h_fc1, W_fc2) + b_fc2
 
-    y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+    self.y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(
         labels=self.y_input, logits=self.pre_softmax)
 
-    self.xent = tf.reduce_sum(y_xent)
+    self.xent = tf.reduce_sum(self.y_xent)
 
     self.y_pred = tf.argmax(self.pre_softmax, 1)
 
@@ -115,7 +115,7 @@ class Model_crop():
             self.y_pred = tf.stack(self.y_pred)
             self.xent_indv = self.xent
             self.xent = tf.reduce_mean(self.xent)
-
+            self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='classifier')
 
 
 class Model_crop_presftmx():#
@@ -149,7 +149,9 @@ class Model_crop_presftmx():#
             self.pre_softmax = tf.reduce_mean(self.pre_softmax, 0)
             self.y_pred = tf.argmax(self.pre_softmax,1)
             y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_softmax)
+            self.xent_indv = tf.expand_dims(y_xent,0)
             self.xent = tf.reduce_sum(y_xent)
+            self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='classifier')
 
 
 class Model_crop_insftmx():#
@@ -163,7 +165,6 @@ class Model_crop_insftmx():#
         loc = [(i, j) for i in loc for j in loc]
         self.softmax = []
         with tf.variable_scope('classifier') as scope:
-            self.y_pred = []
             for i, loc_i in enumerate(loc):
                 # crop
                 loc_x, loc_y = loc_i
@@ -180,11 +181,13 @@ class Model_crop_insftmx():#
                 self.softmax += [x]
                 tf.get_variable_scope().reuse_variables()
                 assert tf.get_variable_scope().reuse == True
-            self.softmax = tf.reduce_mean(self.softmax, 0)
+            self.mean_softmax = tf.reduce_mean(self.softmax, 0)
             # reference: https://github.com/tensorflow/tensorflow/issues/2462
             epsilon = 1e-7
-            self.softmax = tf.clip_by_value(self.softmax, epsilon, 1 - epsilon)
-            self.y_pred = tf.argmax(self.softmax,1)
-            self.pre_softmax = tf.log(self.softmax)
-            y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_softmax)
+            self.mean_softmax = tf.clip_by_value(self.mean_softmax, epsilon, 1 - epsilon)
+            self.y_pred = tf.argmax(self.softmax,2)
+            self.pre_mean_softmax = tf.log(self.mean_softmax)
+            y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_mean_softmax)
+            self.xent_indv = tf.expand_dims(y_xent,0)
             self.xent = tf.reduce_sum(y_xent)
+            self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='classifier')

@@ -2,6 +2,8 @@ cifar/cifar10_data/*
 *.py~
 *.gitignore~
 *.json~
+mnist/ckpt/*
+cifar/ckpt/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
