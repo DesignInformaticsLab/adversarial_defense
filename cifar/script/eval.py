@@ -54,7 +54,14 @@ summary_writer = tf.summary.FileWriter(eval_dir)
 
 # A function for evaluating a single checkpoint
 def evaluate_checkpoint(filename):
-  with tf.Session() as sess:
+  FLAGS = tf.app.flags.FLAGS
+  tfconfig = tf.ConfigProto(
+      allow_soft_placement=True,
+      log_device_placement=True,
+  )
+  tfconfig.gpu_options.allow_growth = True
+  with tf.Session(config=tfconfig) as sess:
+
     # Restore the checkpoint
     saver.restore(sess, filename)
 
