@@ -5,11 +5,12 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from multiGPU_utils import *
 
 class Model(object):
   """ResNet model."""
 
-  def __init__(self, mode):
+  def __init__(self, config, mode):
     """ResNet constructor.
 
     Args:
@@ -20,35 +21,76 @@ class Model(object):
     self.y_input = tf.placeholder(tf.int64, shape=None)
 
     self.y_pred = []
-    self.mean_xent = []
-    self.weight_decay_loss = []
-    # loc = np.arange(12, 20, 4, dtype='int64')
-    loc = [14, 16, 18]
-    loc = [(i, j) for i in loc for j in loc]
-    #loc = [[np.random.randint(10, 22, 1)[0], np.random.randint(10, 22, 1)[0]]]
+    # self.mean_xent = []
+    # self.weight_decay_loss = []
+    loc = [[14, 14], [14, 18], [18, 14], [18, 18], [16, 16]]
+    sub_batch_size = self.sub_batch_size = config['training_batch_size'] // len(loc)
 
-    with tf.variable_scope(tf.get_variable_scope()) as scope:
-        for i, loc_i in enumerate(loc):
-            loc_x, loc_y = loc_i
-            x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
-            mean_xent_i, wd_loss_i, y_pred_i = self._build_model(x_crop_i)
-            self.mean_xent += [mean_xent_i]
-            self.y_pred += [y_pred_i]
-            self.weight_decay_loss += [wd_loss_i]
-            tf.get_variable_scope().reuse_variables()
-            assert tf.get_variable_scope().reuse == True
-    self.mean_xent = tf.reduce_mean(self.mean_xent)
-    self.xent = self.mean_xent
-    self.weight_decay_loss = tf.reduce_mean(self.weight_decay_loss)
+    # Setting up the optimizer
+    step_size_schedule = config['step_size_schedule']
+    weight_decay = config['weight_decay']
+    momentum = config['momentum']
+    boundaries = [int(sss[0]) for sss in step_size_schedule]
+    boundaries = boundaries[1:]
+    values = [sss[1] for sss in step_size_schedule]
+    self.global_step = tf.contrib.framework.get_or_create_global_step()
+    learning_rate = tf.train.piecewise_constant(tf.cast(self.global_step, tf.int32), boundaries, values)
+    self.opts = tf.train.MomentumOptimizer(learning_rate,momentum)
 
-    y_pred = tf.stack(self.y_pred, 1)
+    xent = []
+    prediction = []
+    tower_grads = []
+    adv_grad = []
+    with tf.variable_scope(tf.get_variable_scope()) as vscope:
+        for gpu_i in xrange(1):
+            with tf.device('/gpu:%d' % gpu_i):
+                with tf.name_scope('%s_%d' % ('TOWER', gpu_i)) as tower_scope:
+                    x_input_i = self.x_input[gpu_i * sub_batch_size:(gpu_i + 1) * sub_batch_size]
+                    y_input_i = self.y_input[gpu_i * sub_batch_size:(gpu_i + 1) * sub_batch_size]
+                    xent_i, prediction_i = self.get_voting_model(vscope, tower_scope, x_input_i, y_input_i, loc)
+
+            vscope.reuse_variables()
+            assert vscope.reuse == True
+            total_loss = tf.reduce_mean(xent_i) + weight_decay * tf.reduce_mean(self._decay())
+            # training gradient per mini-batch
+            grad_i = self.opts.compute_gradients(total_loss)
+            # adversarial gradient per mini-batch
+            adv_grad_i = tf.gradients(tf.reduce_mean(xent_i,1), x_input_i)[0]
+            # summing up over mini-batches
+            xent += [xent_i]
+            prediction += [prediction_i]
+            tower_grads += [grad_i]
+            adv_grad += [adv_grad_i]
+
+    self.xent = tf.concat(xent, 0)
+    self.mean_xent = tf.reduce_mean(self.xent)
+
+    self.grads = average_gradients(tower_grads)
+    self.train_step =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
+
+    self.adv_grad = tf.concat(adv_grad,0)
     self.voted_pred = []
-    for i in range(100):  # loop over a batch
-      y, idx, count = tf.unique_with_counts(y_pred[i])
-      majority = tf.argmax(count)
-      self.voted_pred += [tf.gather(y, majority)]
+    for prediction_i in prediction:  # loop over a batch
+        y, idx, count = tf.unique_with_counts(prediction_i)
+        majority = tf.argmax(count)
+        self.voted_pred += [tf.gather(y, majority)]
     self.voted_pred = tf.stack(self.voted_pred)
     self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
+
+  def get_voting_model(self, vscope, name_scope, x_input_i, y_input_i, loc):
+      xent_i = []
+      prediction_i = []
+      for j, loc_i in enumerate(loc):
+          loc_x, loc_y = loc_i
+          x_crop_i = x_input_i[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
+          pre_softmax = self._build_model(x_crop_i)
+          vscope.reuse_variables()
+          assert vscope.reuse == True
+
+          prediction_i += [tf.argmax(pre_softmax, 1)]
+          xent_i_j = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pre_softmax, labels=y_input_i)
+          xent_i += [xent_i_j]
+      return tf.stack(xent_i,1), tf.stack(prediction_i,1)
 
   def add_internal_summaries(self):
     pass
@@ -108,22 +150,9 @@ class Model(object):
       x = self._global_avg_pool(x)
 
     with tf.variable_scope('logit'):
-      self.pre_softmax = self._fully_connected(x, 10)
+      pre_softmax = self._fully_connected(x, 10)
 
-    self.predictions = tf.argmax(self.pre_softmax, 1)
-    # self.correct_prediction = tf.equal(self.predictions, self.y_input)
-    # self.num_correct = tf.reduce_sum(
-    #     tf.cast(self.correct_prediction, tf.int64))
-    # self.accuracy = tf.reduce_mean(
-    #     tf.cast(self.correct_prediction, tf.float32))
-
-    with tf.variable_scope('costs'):
-      self.y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(
-          logits=self.pre_softmax, labels=self.y_input)
-      self.xent = tf.reduce_sum(self.y_xent, name='y_xent')
-      # self.mean_xent = 0.01*tf.reduce_mean(self.y_xent[:50]) + tf.reduce_mean(self.y_xent[50:])
-      self.weight_decay_loss = self._decay()
-    return self.xent, self.weight_decay_loss, self.predictions
+    return pre_softmax
 
 
   def _batch_norm(self, name, x):

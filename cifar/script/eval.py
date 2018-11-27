@@ -14,14 +14,13 @@ import os
 import sys
 import time
 import os
-#os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
-#os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import tensorflow as tf
 
 import cifar10_input
 from model import Model
-from pgd_attack import LinfPGDAttack
+#from pgd_attack import LinfPGDAttack
+from pgd_multiGPU import *
 
 # Global constants
 with open('config.json') as config_file:
@@ -36,23 +35,7 @@ model_dir = config['model_dir']
 # Set upd the data, hyperparameters, and the model
 cifar = cifar10_input.CIFAR10Data(data_path)
 
-if 1:
-  with tf.device("/cpu"):
-    model = Model(mode='eval')
-    attack = LinfPGDAttack(model,
-                           config['epsilon'],
-                           config['num_steps'],
-                           config['step_size'],
-                           config['random_start'],
-                           config['loss_func'])
-else:
-  model = Model(mode='eval')
-  attack = LinfPGDAttack(model,
-                         config['epsilon'],
-                         config['num_steps'],
-                         config['step_size'],
-                         config['random_start'],
-                         config['loss_func'])
+model = Model(mode='eval')
 
 global_step = tf.contrib.framework.get_or_create_global_step()
 
@@ -92,7 +75,8 @@ def evaluate_checkpoint(filename):
       dict_nat = {model.x_input: x_batch,
                   model.y_input: y_batch}
 
-      x_batch_adv = attack.perturb(x_batch, y_batch, sess)
+      #x_batch_adv = attack.perturb(x_batch, y_batch, sess)
+      x_batch_adv = get_PGD(sess, model.adv_grad, dict_nat, model.x_input, epsilon=8. / 255, a=2. / 255, k=7)
 
       dict_adv = {model.x_input: x_batch_adv,
                   model.y_input: y_batch}

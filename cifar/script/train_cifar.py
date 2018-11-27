@@ -4,8 +4,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
-os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from datetime import datetime
 import json
@@ -18,7 +16,8 @@ import numpy as np
 
 from model_cifar import Model
 import cifar10_input
-from pgd_attack import LinfPGDAttack
+# from pgd_attack import LinfPGDAttack
+from pgd_multiGPU import *
 
 with open('config.json') as config_file:
     config = json.load(config_file)
@@ -32,37 +31,21 @@ max_num_training_steps = config['max_num_training_steps']
 num_output_steps = config['num_output_steps']
 num_summary_steps = config['num_summary_steps']
 num_checkpoint_steps = config['num_checkpoint_steps']
-step_size_schedule = config['step_size_schedule']
-weight_decay = config['weight_decay']
 data_path = config['data_path']
-momentum = config['momentum']
 batch_size = config['training_batch_size']
 
 # Setting up the data and the model
 raw_cifar = cifar10_input.CIFAR10Data(data_path)
-global_step = tf.contrib.framework.get_or_create_global_step()
-model = Model(mode='train')
+model = Model(config, mode='train')
 
-# Setting up the optimizer
-boundaries = [int(sss[0]) for sss in step_size_schedule]
-boundaries = boundaries[1:]
-values = [sss[1] for sss in step_size_schedule]
-learning_rate = tf.train.piecewise_constant(
-    tf.cast(global_step, tf.int32),
-    boundaries,
-    values)
-total_loss = model.mean_xent + weight_decay * model.weight_decay_loss
-train_step = tf.train.MomentumOptimizer(learning_rate, momentum).minimize(
-    total_loss,
-    global_step=global_step)
 
 # Set up adversary
-attack = LinfPGDAttack(model,
-                       config['epsilon'],
-                       config['num_steps'],
-                       config['step_size'],
-                       config['random_start'],
-                       config['loss_func'])
+# attack = LinfPGDAttack(model,
+#                        config['epsilon'],
+#                        config['num_steps'],
+#                        config['step_size'],
+#                        config['random_start'],
+#                        config['loss_func'])
 
 # Setting up the Tensorboard and checkpoint outputs
 model_dir = config['model_dir']
@@ -97,46 +80,57 @@ with tf.Session() as sess:
   training_time = 0.0
 
   # Main training loop
+  nat_acc = []
+  adv_acc = []
   for ii in range(max_num_training_steps):
-    x_batch, y_batch = cifar.train_data.get_next_batch(batch_size,
-                                                       multiple_passes=True)
+    x_batch, y_batch = cifar.train_data.get_next_batch(batch_size, multiple_passes=True)
+    nat_dict = {model.x_input: x_batch.reshape(batch_size, 32, 32, 3),
+                      model.y_input: y_batch}
+    x_batch_adv = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=8. / 255, a=2. / 255, k=7)
+    adv_dict = {model.x_input: x_batch_adv.reshape(batch_size, 32, 32, 3),
+                      model.y_input: y_batch}
+    _, adv_acc_i, adv_xent_i = sess.run([model.train_step, model.accuracy, model.xent], feed_dict=adv_dict)
+    nat_acc_i, nat_xent_i = sess.run([model.accuracy, model.xent], feed_dict=nat_dict)
+    nat_acc += [nat_acc_i]
+    adv_acc += [adv_acc_i]
 
-    # Compute Adversarial Perturbations
-    start = timer()
-    x_batch_adv = attack.perturb(x_batch, y_batch, sess)
-    end = timer()
-    training_time += end - start
-
-    nat_dict = {model.x_input: x_batch,
-                model.y_input: y_batch}
-
-    adv_dict = {model.x_input: x_batch_adv,
-                model.y_input: y_batch}
-
-    # Output to stdout
     if ii % num_output_steps == 0:
-      nat_acc = sess.run(model.accuracy, feed_dict=nat_dict)
-      adv_acc = sess.run(model.accuracy, feed_dict=adv_dict)
-      print('Step {}:    ({})'.format(ii, datetime.now()))
-      print('    training nat accuracy {:.4}%'.format(nat_acc * 100))
-      print('    training adv accuracy {:.4}%'.format(adv_acc * 100))
-      if ii != 0:
-        print('    {} examples per second'.format(
-            num_output_steps * batch_size / training_time))
-        training_time = 0.0
-    # Tensorboard summaries
-    if ii % num_summary_steps == 0:
-      summary = sess.run(merged_summaries, feed_dict=adv_dict)
-      summary_writer.add_summary(summary, global_step.eval(sess))
+        print('Step {}:    ({})'.format(ii, datetime.now()))
+        print('    training nat accuracy {:.4}%'.format(np.mean(nat_acc) * 100))
+        print('    training adv accuracy {:.4}%'.format(np.mean(adv_acc) * 100))
+        nat_acc = []
+        adv_acc = []
+        if ii != 0:
+            print('    {} examples per second'.format( num_output_steps * batch_size / training_time))
+            training_time = 0.0
+        # Tensorboard summaries
+        if ii % num_summary_steps == 0:
+          summary = sess.run(merged_summaries, feed_dict=adv_dict)
+          summary_writer.add_summary(summary, model.global_step.eval(sess))
 
-    # Write a checkpoint
-    if ii % num_checkpoint_steps == 0:
-      saver.save(sess,
-                 os.path.join(model_dir, 'checkpoint'),
-                 global_step=global_step)
+        # Write a checkpoint
+        if ii % num_checkpoint_steps == 0:
+          saver.save(sess,
+                     os.path.join(model_dir, 'checkpoint'),
+                     global_step=model.global_step)
 
-    # Actual training step
-    start = timer()
-    sess.run(train_step, feed_dict=adv_dict)
-    end = timer()
-    training_time += end - start
+    #
+    # # Compute Adversarial Perturbations
+    # start = timer()
+    # x_batch_adv = attack.perturb(x_batch, y_batch, sess)
+    # end = timer()
+    # training_time += end - start
+    #
+    # nat_dict = {model.x_input: x_batch,
+    #             model.y_input: y_batch}
+    #
+    # adv_dict = {model.x_input: x_batch_adv,
+    #             model.y_input: y_batch}
+    #
+    # Output to stdout
+
+    # # Actual training step
+    # start = timer()
+    # sess.run(model.train_step, feed_dict=adv_dict)
+    # end = timer()
+    # training_time += end - start
