@@ -80,7 +80,9 @@ with tf.Session() as sess:
   # Main training loop
   nat_acc = []
   adv_acc = []
+  training_time = 0.0
   for ii in range(max_num_training_steps):
+    start = timer()
     x_batch, y_batch = cifar.train_data.get_next_batch(batch_size, multiple_passes=True)
     nat_dict = {model.x_input: x_batch.reshape(batch_size, 32, 32, 3),
                       model.y_input: y_batch}
@@ -91,6 +93,8 @@ with tf.Session() as sess:
     nat_acc_i, nat_xent_i = sess.run([model.accuracy, model.xent], feed_dict=nat_dict)
     nat_acc += [nat_acc_i]
     adv_acc += [adv_acc_i]
+    end = timer()
+    training_time += end - start
 
     if ii % num_output_steps == 0:
         print('Step {}:    ({})'.format(ii, datetime.now()))

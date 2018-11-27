@@ -16,6 +16,7 @@ class Model(object):
     Args:
       mode: One of 'train' and 'eval'.
     """
+    self.n_gpu = 4
     self.mode = mode
     self.x_input = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
     self.y_input = tf.placeholder(tf.int64, shape=None)
@@ -24,7 +25,7 @@ class Model(object):
     # self.mean_xent = []
     # self.weight_decay_loss = []
     loc = [[14, 14], [14, 18], [18, 14], [18, 18], [16, 16]]
-    sub_batch_size = self.sub_batch_size = config['training_batch_size'] // len(loc)
+    sub_batch_size = self.sub_batch_size = config['training_batch_size'] // self.n_gpu
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -42,7 +43,7 @@ class Model(object):
     tower_grads = []
     adv_grad = []
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        for gpu_i in xrange(1):
+        for gpu_i in xrange(self.n_gpu):
             with tf.device('/gpu:%d' % gpu_i):
                 with tf.name_scope('%s_%d' % ('TOWER', gpu_i)) as tower_scope:
                     x_input_i = self.x_input[gpu_i * sub_batch_size:(gpu_i + 1) * sub_batch_size]
@@ -65,6 +66,7 @@ class Model(object):
 
     self.xent = tf.concat(xent, 0)
     self.mean_xent = tf.reduce_mean(self.xent)
+    self.prediction = tf.concat(prediction,0)
 
     self.grads = average_gradients(tower_grads)
     self.train_step =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
@@ -72,7 +74,7 @@ class Model(object):
     self.adv_grad = tf.concat(adv_grad,0)
     self.voted_pred = []
     for i in range(config['training_batch_size']) :  # loop over a batch
-        y, idx, count = tf.unique_with_counts(prediction[i])
+        y, idx, count = tf.unique_with_counts(self.prediction[i])
         majority = tf.argmax(count)
         self.voted_pred += [tf.gather(y, majority)]
     self.voted_pred = tf.stack(self.voted_pred)

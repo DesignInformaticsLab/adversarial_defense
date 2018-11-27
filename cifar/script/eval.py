@@ -18,7 +18,7 @@ import os
 import tensorflow as tf
 
 import cifar10_input
-from model import Model
+from model_cifar import Model
 #from pgd_attack import LinfPGDAttack
 from pgd_multiGPU import *
 
@@ -35,7 +35,7 @@ model_dir = config['model_dir']
 # Set upd the data, hyperparameters, and the model
 cifar = cifar10_input.CIFAR10Data(data_path)
 
-model = Model(mode='eval')
+model = Model(config, mode='eval')
 
 global_step = tf.contrib.framework.get_or_create_global_step()
 
@@ -82,11 +82,11 @@ def evaluate_checkpoint(filename):
                   model.y_input: y_batch}
 
       acc_i, cur_xent_nat = sess.run(
-                                      [model.accuracy,model.xent],
+                                      [model.accuracy,model.mean_xent],
                                       feed_dict = dict_nat)
       cur_corr_nat = acc_i*100
       acc_i, cur_xent_adv = sess.run(
-                                      [model.accuracy,model.xent],
+                                      [model.accuracy,model.mean_xent],
                                       feed_dict = dict_adv)
       cur_corr_adv = acc_i*100
       print(eval_batch_size)

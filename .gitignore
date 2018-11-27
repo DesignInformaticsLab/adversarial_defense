@@ -4,6 +4,7 @@ cifar/cifar10_data/*
 *.json~
 mnist/ckpt/*
 cifar/ckpt/*
+cifar/script/models/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
