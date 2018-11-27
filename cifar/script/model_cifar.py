@@ -61,6 +61,7 @@ class Model(object):
             prediction += [prediction_i]
             tower_grads += [grad_i]
             adv_grad += [adv_grad_i]
+        # self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=tf.get_variable_scope())
 
     self.xent = tf.concat(xent, 0)
     self.mean_xent = tf.reduce_mean(self.xent)
@@ -70,12 +71,13 @@ class Model(object):
 
     self.adv_grad = tf.concat(adv_grad,0)
     self.voted_pred = []
-    for prediction_i in prediction:  # loop over a batch
-        y, idx, count = tf.unique_with_counts(prediction_i)
+    for i in range(config['training_batch_size']) :  # loop over a batch
+        y, idx, count = tf.unique_with_counts(prediction[i])
         majority = tf.argmax(count)
         self.voted_pred += [tf.gather(y, majority)]
     self.voted_pred = tf.stack(self.voted_pred)
     self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
+
 
   def get_voting_model(self, vscope, name_scope, x_input_i, y_input_i, loc):
       xent_i = []

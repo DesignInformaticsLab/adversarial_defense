@@ -60,9 +60,7 @@ if not os.path.exists(model_dir):
 
 saver = tf.train.Saver(max_to_keep=3)
 tf.summary.scalar('accuracy adv train', model.accuracy)
-tf.summary.scalar('accuracy adv', model.accuracy)
-tf.summary.scalar('xent adv train', model.xent / batch_size)
-tf.summary.scalar('xent adv', model.xent / batch_size)
+tf.summary.scalar('xent adv train', model.mean_xent)
 tf.summary.image('images adv train', model.x_input)
 merged_summaries = tf.summary.merge_all()
 
