@@ -22,7 +22,8 @@ class Model(object):
     self.y_pred = []
     self.mean_xent = []
     self.weight_decay_loss = []
-    loc = np.arange(14, 19, 2, dtype='int64')
+    # loc = np.arange(12, 20, 4, dtype='int64')
+    loc = [14, 16, 18]
     loc = [(i, j) for i in loc for j in loc]
     #loc = [[np.random.randint(10, 22, 1)[0], np.random.randint(10, 22, 1)[0]]]
 
@@ -119,10 +120,10 @@ class Model(object):
     with tf.variable_scope('costs'):
       self.y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(
           logits=self.pre_softmax, labels=self.y_input)
-      # self.xent = tf.reduce_sum(self.y_xent, name='y_xent')
-      self.mean_xent = tf.reduce_mean(self.y_xent)
+      self.xent = tf.reduce_sum(self.y_xent, name='y_xent')
+      # self.mean_xent = 0.01*tf.reduce_mean(self.y_xent[:50]) + tf.reduce_mean(self.y_xent[50:])
       self.weight_decay_loss = self._decay()
-    return self.mean_xent, self.weight_decay_loss, self.predictions
+    return self.xent, self.weight_decay_loss, self.predictions
 
 
   def _batch_norm(self, name, x):
