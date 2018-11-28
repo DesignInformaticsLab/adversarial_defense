@@ -42,23 +42,30 @@ class Model(object):
     adv_grad = []
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for gpu_i in xrange(self.n_gpu):
-            loc_x, loc_y = loc[gpu_i]
-            x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
-            crop_xent, crop_prediction = self.get_voting_model(vscope, x_crop_i, self.y_input)
+            with tf.device('/gpu:%d' % gpu_i):
 
-            batchnorm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=vscope)
-            total_loss = tf.reduce_mean(crop_xent) + weight_decay * tf.reduce_mean(self._decay())
-            # training gradient per mini-batch
-            grad_i = self.opts.compute_gradients(total_loss)
+                loc_x, loc_y = loc[gpu_i]
+                x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
+                # crop_xent, crop_prediction = self.get_voting_model(gpu_i, x_crop_i, self.y_input)
+                pre_softmax = self._build_model(x_crop_i)
 
-            # summing up over crops
-            xent += [crop_xent]
-            tower_grads += [grad_i]
-            prediction += [crop_prediction]
-            # adv_grad += [adv_grad_i]
+                # reuse variables
+                tf.get_variable_scope().reuse_variables()
+                crop_prediction = tf.argmax(pre_softmax, 1)
+                crop_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pre_softmax, labels=self.y_input)
 
-        # adversarial gradient per mini-batch
-        self.adv_grad = tf.gradients(tf.reduce_mean(xent,0), self.x_input)[0]
+                batchnorm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=vscope)
+                total_loss = tf.reduce_mean(crop_xent) + weight_decay * tf.reduce_mean(self._decay())
+                # training gradient per mini-batch
+                grad_i = self.opts.compute_gradients(total_loss)
+                # summing up over crops
+                xent += [crop_xent]
+                tower_grads += [grad_i]
+                prediction += [crop_prediction]
+
+                # adversarial gradient per mini-batch
+                adv_grad_i = tf.gradients(crop_xent, self.x_input)[0]
+                adv_grad += [adv_grad_i]
 
     self.xent = tf.stack(xent, 1)
     self.mean_xent = tf.reduce_mean(self.xent)
@@ -69,6 +76,7 @@ class Model(object):
     update_network_op =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
     self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
+    self.adv_grad = tf.reduce_mean(adv_grad)
     self.voted_pred = []
     for i in range(config['training_batch_size']) :  # loop over a batch
         y, idx, count = tf.unique_with_counts(self.prediction[i])
@@ -78,14 +86,6 @@ class Model(object):
     self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
 
     self.vars = tf.trainable_variables()
-
-  def get_voting_model(self, vscope, x_crop_i, y_input_i):
-      pre_softmax = self._build_model(x_crop_i)
-      crop_prediction = tf.argmax(pre_softmax, 1)
-      crop_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pre_softmax, labels=y_input_i)
-      vscope.reuse_variables()
-      assert vscope.reuse == True
-      return crop_xent, crop_prediction
 
   def add_internal_summaries(self):
     pass
