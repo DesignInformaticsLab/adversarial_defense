@@ -60,7 +60,7 @@ def evaluate_checkpoint(filename):
       log_device_placement=True,
   )
   tfconfig.gpu_options.allow_growth = True
-  with tf.Session(config=tfconfig) as sess:
+  with tf.Session() as sess:#config=tfconfig
 
     # Restore the checkpoint
     saver.restore(sess, filename)

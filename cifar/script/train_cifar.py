@@ -58,7 +58,7 @@ if not os.path.exists(model_dir):
 # - train of different runs
 # - eval of different runs
 
-saver = tf.train.Saver(max_to_keep=3)
+saver = tf.train.Saver(max_to_keep=30)
 tf.summary.scalar('accuracy adv train', model.accuracy)
 tf.summary.scalar('xent adv train', model.mean_xent)
 tf.summary.image('images adv train', model.x_input)
@@ -73,7 +73,7 @@ tfconfig = tf.ConfigProto(
     log_device_placement=True,
 )
 tfconfig.gpu_options.allow_growth = True
-with tf.Session(config=tfconfig) as sess:
+with tf.Session() as sess:#config=tfconfig
 
   # initialize data augmentation
   cifar = cifar10_input.AugmentedCIFAR10Data(raw_cifar, sess, model)
