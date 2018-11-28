@@ -105,22 +105,18 @@ with tf.Session() as sess:#config=tfconfig
     if ii % num_output_steps == 0:
         print('Step {}:    ({})'.format(ii, datetime.now()))
         print('    training nat accuracy {:.4}%'.format(np.mean(nat_acc) * 100))
-        print('    training adv accuracy {:.4}%'.format(np.mean(adv_acc) * 100))
-        nat_acc = []
-        adv_acc = []
-        if ii != 0:
-            print('    {} examples per second'.format( num_output_steps * batch_size / training_time))
+        print('    training adv accuracy {:.4}%'.format(np.mean(adv_acc) * 100)_output_steps * batch_size / training_time))
             training_time = 0.0
-        # Tensorboard summaries
-        if ii % num_summary_steps == 0:
-          summary = sess.run(merged_summaries, feed_dict=adv_dict)
-          summary_writer.add_summary(summary, model.global_step.eval(sess))
+    # Tensorboard summaries
+    if ii % num_summary_steps == 0:
+      summary = sess.run(merged_summaries, feed_dict=adv_dict)
+      summary_writer.add_summary(summary, model.global_step.eval(sess))
 
-        # Write a checkpoint
-        if ii % num_checkpoint_steps == 0:
-          saver.save(sess,
-                     os.path.join(model_dir, 'checkpoint'),
-                     global_step=model.global_step)
+    # Write a checkpoint
+    if ii % num_checkpoint_steps == 0:
+      saver.save(sess,
+                 os.path.join(model_dir, 'checkpoint'),
+                 global_step=model.global_step)
 
     #
     # # Compute Adversarial Perturbations

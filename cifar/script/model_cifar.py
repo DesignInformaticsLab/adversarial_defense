@@ -16,14 +16,12 @@ class Model(object):
     Args:
       mode: One of 'train' and 'eval'.
     """
-    self.n_gpu = 2
     self.mode = mode
     self.x_input = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
     self.y_input = tf.placeholder(tf.int64, shape=None)
-
+    self.config = config
     self.y_pred = []
-    loc = [[14, 14], [14, 18]]#, [18, 14], [18, 18], [16, 16]]
-    batch_size = config['training_batch_size']
+    self.loc = [[14, 14], [14, 18], [18, 14], [18, 18], [16, 16]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -40,13 +38,14 @@ class Model(object):
     prediction = []
     tower_grads = []
     adv_grad = []
+    
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        for gpu_i in xrange(self.n_gpu):
+        for ii in xrange(len(self.loc)):
+            gpu_i=ii if mode == 'train' else 0
             with tf.device('/gpu:%d' % gpu_i):
 
-                loc_x, loc_y = loc[gpu_i]
+                loc_x, loc_y = self.loc[ii]
                 x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
-                # crop_xent, crop_prediction = self.get_voting_model(gpu_i, x_crop_i, self.y_input)
                 pre_softmax = self._build_model(x_crop_i)
 
                 # reuse variables
@@ -78,7 +77,8 @@ class Model(object):
 
     self.adv_grad = tf.reduce_mean(adv_grad)
     self.voted_pred = []
-    for i in range(config['training_batch_size']) :  # loop over a batch
+    batch_size = config['training_batch_size'] if mode == "train" else config['eval_batch_size']
+    for i in range(batch_size) :  # loop over a batch
         y, idx, count = tf.unique_with_counts(self.prediction[i])
         majority = tf.argmax(count)
         self.voted_pred += [tf.gather(y, majority)]
