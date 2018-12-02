@@ -91,11 +91,11 @@ def evaluate_checkpoint(filename):
       acc_i, cur_xent_nat = sess.run(
                                       [model.accuracy,model.mean_xent],
                                       feed_dict = dict_nat)
-      cur_corr_nat = acc_i*cfg['eval_batch_size']
+      cur_corr_nat = acc_i*config['eval_batch_size']
       acc_i, cur_xent_adv = sess.run(
                                       [model.accuracy,model.mean_xent],
                                       feed_dict = dict_adv)
-      cur_corr_adv = acc_i*cfg['eval_batch_size']
+      cur_corr_adv = acc_i*config['eval_batch_size']
       print(eval_batch_size)
       print("Correctly classified natural examples: {}".format(cur_corr_nat))
       print("Correctly classified adversarial examples: {}".format(cur_corr_adv))

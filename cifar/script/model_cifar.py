@@ -75,7 +75,7 @@ class Model(object):
     update_network_op =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
     self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
-    self.adv_grad = tf.reduce_mean(adv_grad)
+    self.adv_grad = tf.reduce_mean(adv_grad,0)
     self.voted_pred = []
     batch_size = config['training_batch_size'] if mode == "train" else config['eval_batch_size']
     for i in range(batch_size) :  # loop over a batch

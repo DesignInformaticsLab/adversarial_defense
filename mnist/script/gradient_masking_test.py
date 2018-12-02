@@ -7,7 +7,7 @@ from pgd_attack import LinfPGDAttack
 slim = tf.contrib.slim
 import matplotlib.pyplot as plt
 os.environ['CUDA_DEVICE_ORDER'] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 class Model_crop():
     def __init__(self, x, y, idx=None):
@@ -114,8 +114,8 @@ def get_model():
 
 def get_grads(sess, input_images, input_label, nat_dict_train):
     # ckpt_path = '../ckpt/crop64_20_nat_itr35k/bb_64crop_ckpt'
-    ckpt_path = '../ckpt/crop9_20_insftmx_itr170k/insftmx_crop_ckpt'
-
+    # ckpt_path = '../ckpt/crop9_20_insftmx_itr170k/insftmx_crop_ckpt'
+    ckpt_path = '../ckpt/crop9_20_itr150k/crop_ckpt'
     ## MODEL1 ##
     tf.get_variable_scope().reuse_variables()
     model1 = Model_crop_insftmx(input_images, input_label, theta_ratio=0.01)
