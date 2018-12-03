@@ -21,7 +21,7 @@ class Model(object):
     self.y_input = tf.placeholder(tf.int64, shape=None)
     self.config = config
     self.y_pred = []
-    self.loc = [[14, 14], [16, 16]]#, [14, 18], [18, 14], [18, 18]
+    self.loc = [[14, 14], [14, 18], [18, 14], [18, 18]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']

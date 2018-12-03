@@ -13,7 +13,7 @@ import math
 import os
 import sys
 import time
-import os
+import numpy as np
 
 import tensorflow as tf
 
@@ -77,6 +77,7 @@ def evaluate_checkpoint(filename):
       bend = min(bstart + eval_batch_size, num_eval_examples)
 
       x_batch = cifar.eval_data.xs[bstart:bend, :]
+      x_batch = np.asarray(x_batch, 'float32') / 255.
       y_batch = cifar.eval_data.ys[bstart:bend]
 
       dict_nat = {model.x_input: x_batch,

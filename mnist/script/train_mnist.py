@@ -54,12 +54,17 @@ def main(cfg):
     train_iters=500000
     for itr in tqdm(range(train_iters)):
         x_batch_train, y_batch_train = mnist.train.next_batch(batch_size)
-        x_batch_train_adv = attack.perturb(x_batch_train.reshape(batch_size, img_size, img_size, 1), y_batch_train, sess)
-        adv_dict_train = {input_images: x_batch_train_adv.reshape(batch_size, img_size, img_size, 1),
-                         input_label: y_batch_train}
-        nat_dict_train = {input_images: x_batch_train.reshape(batch_size, img_size, img_size, 1),
-                          input_label: y_batch_train}
-        sess.run(train_op, feed_dict=adv_dict_train)
+        if 1: # adv train
+            x_batch_train_adv = attack.perturb(x_batch_train.reshape(batch_size, img_size, img_size, 1), y_batch_train, sess)
+            adv_dict_train = {input_images: x_batch_train_adv.reshape(batch_size, img_size, img_size, 1),
+                             input_label: y_batch_train}
+            nat_dict_train = {input_images: x_batch_train.reshape(batch_size, img_size, img_size, 1),
+                              input_label: y_batch_train}
+            sess.run(train_op, feed_dict=adv_dict_train)
+        else: # nat train
+            nat_dict_train = {input_images: x_batch_train.reshape(batch_size, img_size, img_size, 1),
+                              input_label: y_batch_train}
+            sess.run(train_op, feed_dict=nat_dict_train)
 
         if itr % 100 == 0:
             y_pred, train_loss_i = sess.run([model.y_pred, model.xent], feed_dict=nat_dict_train)

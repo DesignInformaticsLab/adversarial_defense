@@ -90,6 +90,8 @@ with tf.Session() as sess:#config=tfconfig
   for ii in range(max_num_training_steps):
     start = timer()
     x_batch, y_batch = cifar.train_data.get_next_batch(batch_size, multiple_passes=True)
+    x_batch = np.asarray(x_batch, 'float32') / 255.
+
     nat_dict = {model.x_input: x_batch.reshape(batch_size, 32, 32, 3),
                       model.y_input: y_batch}
     x_batch_adv = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=8. / 255, a=2. / 255, k=7)

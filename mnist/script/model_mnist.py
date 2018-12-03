@@ -87,8 +87,9 @@ class Model_crop():
 
         self.x_voting = []
         self.x_crop = []
-        loc = np.arange(10,18,3, dtype='int64')
-        loc = [(i, j) for i in loc for j in loc]
+        # loc = np.arange(10,18,3, dtype='int64')
+        # loc = [(i, j) for i in loc for j in loc]
+        loc = [[10, 10], [10, 14], [10, 18], [14, 10], [14, 14], [14, 18], [18, 10], [18, 14], [18, 18]]
         if idx!=None:
             loc = loc[idx:idx+1]
         self.xent = []

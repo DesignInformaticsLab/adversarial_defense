@@ -43,19 +43,19 @@ def print_tensors_in_checkpoint_file(file_name, tensor_name, all_tensors,
   """
   try:
     reader = pywrap_tensorflow.NewCheckpointReader(file_name)
-    net = {
-    'conv1_b': reader.get_tensor('classifier/conv1/biases'),
-    'conv1_w': reader.get_tensor('classifier/conv1/weights'),
-    'conv2_b': reader.get_tensor('classifier/conv2/biases'),
-    'conv2_w': reader.get_tensor('classifier/conv2/weights'),
-    'fc1_b': reader.get_tensor('classifier/fc1/biases'),
-    'fc1_w': reader.get_tensor('classifier/fc1/weights'),
-    'fc2_b': reader.get_tensor('classifier/fc2/biases'),
-    'fc2_w': reader.get_tensor('classifier/fc2/weights'),
-    }
-    import scipy.io as sio
-    sio.savemat('mnist_net',net)
-    exit(1)
+    # net = {
+    # 'conv1_b': reader.get_tensor('classifier/conv1/biases'),
+    # 'conv1_w': reader.get_tensor('classifier/conv1/weights'),
+    # 'conv2_b': reader.get_tensor('classifier/conv2/biases'),
+    # 'conv2_w': reader.get_tensor('classifier/conv2/weights'),
+    # 'fc1_b': reader.get_tensor('classifier/fc1/biases'),
+    # 'fc1_w': reader.get_tensor('classifier/fc1/weights'),
+    # 'fc2_b': reader.get_tensor('classifier/fc2/biases'),
+    # 'fc2_w': reader.get_tensor('classifier/fc2/weights'),
+    # }
+    # import scipy.io as sio
+    # sio.savemat('mnist_net',net)
+    # exit(1)
 
     if all_tensors or all_tensor_names:
       var_to_shape_map = reader.get_variable_to_shape_map()
@@ -132,7 +132,7 @@ if __name__ == "__main__":
   parser.add_argument(
       "--file_name",
       type=str,
-      default="",
+      default="/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/crop9_20_itr150k/crop_ckpt",
       help="Checkpoint filename. "
       "Note, if using Checkpoint V2 format, file_name is the "
       "shared prefix between all files in the checkpoint.")
