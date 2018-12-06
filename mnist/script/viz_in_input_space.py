@@ -30,8 +30,9 @@ def get_model(input_images_pl, input_label_pl, case):
     sess = tf.Session(config=tfconfig)
 
     ## OPTIMIZER ##
+    _lambda = 1.
     cls_score = tf.gather(model.pre_softmax[0], input_label_pl[0])
-    loss = cls_score #- 0.0001 * tf.nn.l2_loss(input_images_pl)
+    loss = cls_score - _lambda * tf.nn.l2_loss(input_images_pl)
     grad = tf.gradients(loss, model.x_input)[0]
 
     sess.run(tf.global_variables_initializer())
@@ -68,10 +69,11 @@ def run_model(sess, metric, grad, x_batch):
 
 def viz_input(result):
     st_cls_score, ed_cls_score, st_img, ed_img = result['st_cls_score'], result['ed_cls_score'], result['st_img'], result['ed_img']
-    ref_img = result['ref_img']
+    ref_cls_score, ref_img = result['ref_cls_score'], result['ref_img']
     fig1 = plt.figure()
     sns.distplot(st_cls_score, label='st')
     sns.distplot(ed_cls_score, label='ed')
+    sns.distplot(ref_cls_score, label='ref')
     plt.legend()
 
     fig2 = plt.figure()
@@ -107,29 +109,31 @@ if __name__ == '__main__':
     input_images_pl = tf.placeholder(shape=(batch_size, img_size, img_size, 1), dtype=tf.float32, name='input_pl')
     input_label_pl = tf.placeholder(shape=(batch_size), dtype=tf.int64, name='label_pl')
 
-    sess, metric, grad1 = get_model(input_images_pl, input_label_pl, 'M_adv')
-    # tf.reset_graph()
-    # sess, metric, grad2 = get_model(input_images_pl, input_label_pl, 'M_nat')
-    # sess, metric, grad3 = get_model(input_images_pl, input_label_pl, 'M_nat')
-    # sess, metric, grad4 = get_model(input_images_pl, input_label_pl, 'M_nat')
+    # sess, metric, grad = get_model(input_images_pl, input_label_pl, 'M_adv')
+    sess, metric, grad = get_model(input_images_pl, input_label_pl, 'M_nat')
+    # sess, metric, grad = get_model(input_images_pl, input_label_pl, 'C_nat')
+    # sess, metric, grad = get_model(input_images_pl, input_label_pl, 'C_adv')
 
-    grad = grad1
+    # tf.reset_graph()
     result = {'st_cls_score': [],
               'ed_cls_score': [],
+              'ref_cls_score': [],
               'st_img': [],
               'ed_img': [],
-              'ref_img':[]
+              'ref_img':[],
               }
-    for i in range(100):
+    for i in range(300):
         x_batch, y_batch = mnist.test.next_batch(batch_size)
         x_batch = x_batch.reshape((batch_size,img_size,img_size,1))
         x_batch_rand = np.random.randn(batch_size,img_size,img_size,1)
-        hist = run_model(sess, metric, grad, x_batch_rand)
+        hist = run_model(sess, metric, grad, x_batch)
+        ref_cls_score_i = sess.run(metric['cls_score'],  {input_images_pl:x_batch, input_label_pl:y_batch})
         result['st_cls_score'] += [hist['cls_score'][0]]
         result['ed_cls_score'] += [hist['cls_score'][-1]]
+        result['ref_cls_score'] += [ref_cls_score_i]
         result['ref_img'] += [x_batch]
         result['st_img'] += [hist['input'][0]]
         result['ed_img'] += [hist['input'][-1]]
     viz_input(result)
-
+    plt.show()
     print('done')

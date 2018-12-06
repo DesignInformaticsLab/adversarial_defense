@@ -95,7 +95,7 @@ with tf.Session() as sess:#config=tfconfig
     nat_dict = {model.x_input: x_batch.reshape(batch_size//2, 32, 32, 3),
                       model.y_input: y_batch}
     x_batch_adv = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=8. / 255, a=2. / 255, k=7)
-    x_batch_adv_near = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=2. / 255, a=0.5 / 255, k=5)
+    x_batch_adv_near = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=1. / 255, a=0.5 / 255, k=3)
     adv_dict = {model.x_input: np.concatenate([x_batch_adv,x_batch_adv_near],0).reshape(batch_size, 32, 32, 3),
                       model.y_input: np.concatenate([y_batch,y_batch],0)}
     nat_dict = {model.x_input: np.concatenate([x_batch,x_batch],0).reshape(batch_size, 32, 32, 3),
