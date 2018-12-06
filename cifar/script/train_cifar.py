@@ -123,23 +123,40 @@ with tf.Session() as sess:#config=tfconfig
                  os.path.join(model_dir, 'checkpoint'),
                  global_step=model.global_step)
 
-    #
-    # # Compute Adversarial Perturbations
-    # start = timer()
-    # x_batch_adv = attack.perturb(x_batch, y_batch, sess)
-    # end = timer()
-    # training_time += end - start
-    #
-    # nat_dict = {model.x_input: x_batch,
-    #             model.y_input: y_batch}
-    #
-    # adv_dict = {model.x_input: x_batch_adv,
-    #             model.y_input: y_batch}
-    #
-    # Output to stdout
+    if 0:
+        # history replay
+        start = timer()
+        sess.run(model.train_step, feed_dict=adv_dict)
 
-    # # Actual training step
-    # start = timer()
-    # sess.run(model.train_step, feed_dict=adv_dict)
-    # end = timer()
-    # training_time += end - start
+        if ii > 20000 and adv_acc > 0.3 and nat_acc > 0.6:
+            nat_correct_prediction = sess.run(model.correct_prediction, feed_dict=nat_dict)
+            adv_correct_prediction = sess.run(model.correct_prediction, feed_dict=adv_dict)
+            idx = nat_correct_prediction * ~ adv_correct_prediction
+            if 'adv_x_pool' in locals():
+                adv_x_pool = np.concatenate([adv_x_pool, adv_dict[model.x_input][idx]], 0)
+                adv_y_pool = np.concatenate([adv_y_pool, adv_dict[model.y_input][idx]], 0)
+                prob_pool = np.concatenate([prob_pool, np.ones(np.sum(idx))])
+            else:
+                adv_x_pool = adv_dict[model.x_input][idx]
+                adv_y_pool = adv_dict[model.y_input][idx]
+                prob_pool = np.ones(np.sum(idx))
+            if ii % 1000 == 0:
+                adv_replay_dict = {'adv_x': adv_x_pool, 'adv_y': adv_y_pool, 'adv_p': prob_pool}
+                np.save('adv_replay_dict', adv_replay_dict)
+
+        # history replay
+        if 'adv_x_pool' in locals():
+            if adv_x_pool.shape[0] >= batch_size:
+                from numpy.random import choice
+
+                rand_idx = choice(adv_x_pool.shape[0], batch_size, p=prob_pool / np.sum(prob_pool))
+                adv_x_replay = adv_x_pool[rand_idx]
+                adv_y_replay = adv_y_pool[rand_idx]
+                adv_dict_replay = {model.x_input: adv_x_replay,
+                                   model.y_input: adv_y_replay}
+                sess.run(model.train_step, feed_dict=adv_dict_replay)
+                adv_replay_correct_prediction = sess.run(model.correct_prediction, feed_dict=adv_dict_replay)
+                prob_pool[rand_idx[~adv_replay_correct_prediction]] /= 2.
+
+        end = timer()
+        training_time += end - start
