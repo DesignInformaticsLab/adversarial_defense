@@ -36,18 +36,8 @@ def get_net_weights(ckpt_path, flag):
     # sio.savemat('mnist_net',net)
     return net
 
-def get_viz(aa):
+def get_viz_conv1(aa):
 
-    # fig = plt.figure()
-    # w_image = np.zeros((5 * 4 + 3, 5 * 8 + 7))
-    # for i in range(4):
-    #     for j in range(8):
-    #         w_image[5 * i+i:5 * (i + 1)+i, 5 * j+j:5 * (j + 1)+j] = aa['conv1_w'][:, :, 0, 8 * i + j]
-    # plt.imshow(w_image)
-    # plt.colorbar()
-    # plt.show()
-
-    # of different magnitude
     fig = plt.figure(figsize=(6, 3))
     fig.tight_layout()
     for i in range(4):
@@ -56,21 +46,24 @@ def get_viz(aa):
             plt.imshow(aa['conv1_w'][:, :, 0, 8 * i + j], vmin=0, vmax=1)
             plt.axis('off')
             # plt.colorbar()
-    # plt.show()
-    #
-    # dd = 10
-    # with tf.Session() as sess:
-    #     conv2 = tf.nn.conv2d_transpose(aa['conv2_w'].transpose(3, 0, 1, 2), aa['conv1_w'], strides=[1, 2, 2, 1],
-    #                                    output_shape=[64, dd, dd, 1])
-    #     conv2 = sess.run(conv2)
-    # w_image = np.zeros((dd * 8, dd * 8))
-    # for i in range(8):
-    #     for j in range(8):
-    #         w_image[dd * i:dd * (i + 1), dd * j:dd * (j + 1)] = conv2[8 * i + j, :, :, 0]
-    # plt.imshow(np.abs(w_image))
-    # plt.colorbar()
-    #
-    # print('done')
+    return fig
+
+def get_viz_conv2(aa):
+
+
+    dd = 10
+    with tf.Session() as sess:
+        conv2 = tf.nn.conv2d_transpose(aa['conv2_w'].transpose(3, 0, 1, 2), aa['conv1_w'], strides=[1, 2, 2, 1],
+                                       output_shape=[64, dd, dd, 1])
+        conv2 = sess.run(conv2)
+    w_image = np.zeros((dd * 8, dd * 8))
+    for i in range(8):
+        for j in range(8):
+            w_image[dd * i:dd * (i + 1), dd * j:dd * (j + 1)] = conv2[8 * i + j, :, :, 0]
+    plt.imshow(np.abs(w_image))
+    plt.colorbar()
+
+    print('done')
     return fig
 
 def get_activation(ckpt_path):
@@ -106,24 +99,25 @@ def get_activation(ckpt_path):
 
 
 if __name__ == '__main__':
-    # first layer filters
-    ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/madry/natural/checkpoint-24900'
-    net = get_net_weights(ckpt_path, 1)
-    fig = get_viz(net)
-
-    ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/madry/secret/checkpoint-99900'
-    net = get_net_weights(ckpt_path, 1)
-    fig = get_viz(net)
-
-    ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/crop9_20_nat_itr50k/crop_ckpt'
-    net = get_net_weights(ckpt_path, 0)
-    fig = get_viz(net)
+    # # first layer filters
+    # ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/madry/natural/checkpoint-24900'
+    # net = get_net_weights(ckpt_path, 1)
+    # fig = get_viz_conv2(net)
+    #
+    # ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/madry/secret/checkpoint-99900'
+    # net = get_net_weights(ckpt_path, 1)
+    # fig = get_viz_conv2(net)
+    #
+    # ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/crop9_20_nat_itr50k/crop_ckpt'
+    # net = get_net_weights(ckpt_path, 0)
+    # fig = get_viz_conv2(net)
 
     ckpt_path = '/home/hope-yao/Documents/adversarial_defense/mnist/ckpt/crop9_20_itr150k/crop_ckpt'
     net = get_net_weights(ckpt_path, 0)
-    fig = get_viz(net)
+    fig = get_viz_conv2(net)
     plt.show()
 
+    # second layer filters
     print('done')
 
 

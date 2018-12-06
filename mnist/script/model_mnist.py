@@ -55,8 +55,7 @@ class Model_madry(object):
     self.num_correct = tf.reduce_sum(tf.cast(correct_prediction, tf.int64))
     self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-
-
+    self.vars = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1, W_fc2, b_fc2]
 
   @staticmethod
   def _weight_variable(shape):
@@ -87,8 +86,7 @@ class Model_crop():
 
         self.x_voting = []
         self.x_crop = []
-        # loc = np.arange(10,18,3, dtype='int64')
-        # loc = [(i, j) for i in loc for j in loc]
+        self.pre_softmax = []
         loc = [[10, 10], [10, 14], [10, 18], [14, 10], [14, 14], [14, 18], [18, 10], [18, 14], [18, 18]]
         if idx!=None:
             loc = loc[idx:idx+1]
@@ -107,12 +105,14 @@ class Model_crop():
                 x = slim.max_pool2d(x, kernel_size=2)
                 x = slim.flatten(x, scope='flatten')
                 x = slim.fully_connected(x, num_outputs=1024, scope='fc1')
-                pre_softmax = x = slim.fully_connected(x, num_outputs=10, activation_fn=None, scope='fc2')
+                pre_softmax = slim.fully_connected(x, num_outputs=10, activation_fn=None, scope='fc2')
+                self.pre_softmax += [pre_softmax]
                 self.y_pred += [tf.argmax(pre_softmax, 1)]
                 y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=pre_softmax)
                 self.xent += [y_xent]
                 tf.get_variable_scope().reuse_variables()
                 assert tf.get_variable_scope().reuse == True
+            self.pre_softmax = tf.reduce_mean(self.pre_softmax,0)
             self.y_pred = tf.stack(self.y_pred)
             self.xent_indv = self.xent
             self.xent = tf.reduce_mean(self.xent)
@@ -187,7 +187,7 @@ class Model_crop_insftmx():#
             epsilon = 1e-7
             self.mean_softmax = tf.clip_by_value(self.mean_softmax, epsilon, 1 - epsilon)
             self.y_pred = tf.argmax(self.softmax,2)
-            self.pre_mean_softmax = tf.log(self.mean_softmax)
+            self.pre_softmax = self.pre_mean_softmax = tf.log(self.mean_softmax)
             y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_mean_softmax)
             self.xent_indv = tf.expand_dims(y_xent,0)
             self.xent = tf.reduce_sum(y_xent)
