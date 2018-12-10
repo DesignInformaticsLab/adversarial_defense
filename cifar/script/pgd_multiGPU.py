@@ -11,30 +11,31 @@ import tensorflow as tf
 import numpy as np
 import copy
 
-def get_PGD(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon=0.1, a=0.002, k=50, rand=True, dist='Linf'):
+def get_PGD(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon=0.1, a=0.002, k=50, rand=False, dist='Linf'):
   if dist == 'Linf':
-    x = get_PGD_Linf(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon, a, k, rand)
+    x = get_PGD_Linf(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, a, k, rand)
   elif dist == 'L2':
-    x = get_PGD_L2(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon, a, k, rand)
+    x = get_PGD_L2(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, a, k, rand)
   else:
     print('not implemented')
   return x
 
 
-def get_PGD_Linf(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon, a, k, rand):
+def get_PGD_Linf(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, a, k, rand):
   """Given a set of examples (x_nat, y), returns a set of adversarial
      examples within epsilon of x_nat in l_infinity norm."""
 
-  x_nat = feed_dict_pgd[x_input_pl]
   if rand:
-    x = x_nat + np.random.uniform(-epsilon, epsilon, x_nat.shape)
+    x = np.copy(x_nat) + np.random.uniform(-epsilon, epsilon, x_nat.shape)
   else:
     x = np.copy(x_nat)
 
+
   for i in range(k):
-    grad = sess.run(adv_grad, feed_dict=feed_dict_pgd)
+    grad = sess.run(adv_grad, feed_dict={x_input_pl: x, y_input_pl: y_nat})
     #print(grad.shape)
-    x += a * np.sign(grad)
+    # x += a * np.sign(grad)
+    x = np.add(x, a * np.sign(grad), out=x, casting='unsafe')
     x = np.clip(x, x_nat - epsilon, x_nat + epsilon)
     x = np.clip(x, 0, 1)  # ensure valid pixel range
 
@@ -60,11 +61,10 @@ def sphere_rand(input_size, epsilon):
   return  np.concatenate(x,0)
 
 
-def get_PGD_L2(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon, a, k, rand):
+def get_PGD_L2(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, a, k, rand):
   """Given a set of examples (x_nat, y), returns a set of adversarial
      examples within epsilon of x_nat in l_infinity norm."""
 
-  x_nat = feed_dict_pgd[x_input_pl]
   input_size = x_input_pl.get_shape().as_list()
   bs = input_size[0]
 
@@ -76,7 +76,7 @@ def get_PGD_L2(sess, adv_grad, feed_dict_pgd, x_input_pl, epsilon, a, k, rand):
     x = np.copy(x_nat)
 
   for i in range(k):
-    grad = sess.run(adv_grad, feed_dict=feed_dict_pgd)
+    grad = sess.run(adv_grad, feed_dict={x_input_pl: x, y_input_pl: y_nat})
 
     if 1:
       # attack normalize

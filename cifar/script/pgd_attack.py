@@ -21,7 +21,7 @@ class LinfPGDAttack:
     self.epsilon = epsilon
     self.num_steps = num_steps
     self.step_size = step_size
-    self.rand = random_start
+    self.rand = False
 
     if loss_func == 'xent':
       loss = model.xent
@@ -38,14 +38,15 @@ class LinfPGDAttack:
       print('Unknown loss function. Defaulting to cross-entropy')
       loss = model.xent
 
-    self.grad = tf.gradients(loss, model.x_input)[0]
+    self.grads = [tf.gradients(tf.reduce_mean(model.xent[:, i]), model.x_input)[0] for i in range(4)]
+    self.grad = tf.gradients(tf.reduce_sum(loss), model.x_input)[0]
 
   def perturb(self, x_nat, y, sess):
     """Given a set of examples (x_nat, y), returns a set of adversarial
        examples within epsilon of x_nat in l_infinity norm."""
     if self.rand:
       x = x_nat + np.random.uniform(-self.epsilon, self.epsilon, x_nat.shape)
-      x = np.clip(x, 0, 255) # ensure valid pixel range
+      x = np.clip(x, 0, 1) # ensure valid pixel range
     else:
       x = np.copy(x_nat)
 
@@ -56,7 +57,7 @@ class LinfPGDAttack:
       x = np.add(x, self.step_size * np.sign(grad), out=x, casting='unsafe')
 
       x = np.clip(x, x_nat - self.epsilon, x_nat + self.epsilon)
-      x = np.clip(x, 0, 255) # ensure valid pixel range
+      x = np.clip(x, 0, 1) # ensure valid pixel range
 
     return x
 

@@ -37,7 +37,7 @@ class Model(object):
     xent = []
     prediction = []
     tower_grads = []
-    adv_grad = []
+    self.adv_grads = []
     
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for ii in xrange(len(self.loc)):
@@ -63,8 +63,8 @@ class Model(object):
                 prediction += [crop_prediction]
 
                 # adversarial gradient per mini-batch
-                adv_grad_i = tf.gradients(crop_xent, self.x_input)[0]
-                adv_grad += [adv_grad_i]
+                adv_grad_i = tf.gradients(tf.reduce_sum(crop_xent), self.x_input)[0]
+                self.adv_grads += [adv_grad_i]
 
     self.xent = tf.stack(xent, 1)
     self.mean_xent = tf.reduce_mean(self.xent)
@@ -75,7 +75,7 @@ class Model(object):
     update_network_op =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
     self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
-    self.adv_grad = tf.reduce_mean(adv_grad,0)
+    self.adv_grad = tf.reduce_sum(self.adv_grads,0)
     self.voted_pred = []
     batch_size = config['training_batch_size'] if mode == "train" else config['eval_batch_size']
     for i in range(batch_size) :  # loop over a batch

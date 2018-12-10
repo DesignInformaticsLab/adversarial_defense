@@ -36,8 +36,6 @@ model_dir = config['model_dir']
 cifar = cifar10_input.CIFAR10Data(data_path)
 
 model = Model(config, mode='eval')
-from pgd_attack import LinfPGDAttack
-attack = LinfPGDAttack(model, epsilon=8 / 255., num_steps=7, step_size=2 / 255., random_start=True, loss_func='xent')
 
 global_step = tf.contrib.framework.get_or_create_global_step()
 
@@ -48,22 +46,31 @@ eval_dir = os.path.join(model_dir, 'eval')
 if not os.path.exists(eval_dir):
   os.makedirs(eval_dir)
 
-last_checkpoint_filename = ''
 already_seen_state = False
 
 saver = tf.train.Saver()
 summary_writer = tf.summary.FileWriter(eval_dir)
 
+check_dict = {
+'nat_img': [],
+'adv_img': [],
+'nat_pred': [],
+'adv_pred': [],
+'nat_preds': [],
+'adv_preds': [],
+'label': [],
+'ckeck_idx': []
+}
+
 # A function for evaluating a single checkpoint
 def evaluate_checkpoint(filename):
-  filename = '/home/hope-yao/Documents/adversarial_defense/cifar/ckpt/crop_4_20_adv/half_half/lr_config1_adv/checkpoint-25001'
   FLAGS = tf.app.flags.FLAGS
   tfconfig = tf.ConfigProto(
       allow_soft_placement=True,
       log_device_placement=True,
   )
   tfconfig.gpu_options.allow_growth = True
-  with tf.Session(config=tfconfig) as sess:#
+  with tf.Session() as sess:#config=tfconfig
 
     # Restore the checkpoint
     saver.restore(sess, filename)
@@ -86,20 +93,18 @@ def evaluate_checkpoint(filename):
       dict_nat = {model.x_input: x_batch,
                   model.y_input: y_batch}
 
-      if 0:
-          x_batch_adv = attack.perturb(x_batch, y_batch, sess)
-      else:
-          x_batch_adv = get_PGD(sess, model.adv_grad, model.x_input, model.y_input, x_batch, y_batch, epsilon=8. / 255, a=2. / 255, k=7)
+      #x_batch_adv = attack.perturb(x_batch, y_batch, sess)
+      x_batch_adv = get_PGD(sess, model.adv_grad, dict_nat, model.x_input, epsilon=8. / 255, a=0.2 / 255, k=70)
 
       dict_adv = {model.x_input: x_batch_adv,
                   model.y_input: y_batch}
 
-      acc_i, cur_xent_nat = sess.run(
-                                      [model.accuracy,model.mean_xent],
+      nat_prediction, nat_voted_pred, acc_i, cur_xent_nat = sess.run(
+                                      [model.prediction, model.voted_pred, model.accuracy,model.mean_xent],
                                       feed_dict = dict_nat)
       cur_corr_nat = acc_i*config['eval_batch_size']
-      acc_i, cur_xent_adv = sess.run(
-                                      [model.accuracy,model.mean_xent],
+      adv_prediction, adv_voted_pred, acc_i, cur_xent_adv = sess.run(
+                                      [model.prediction, model.voted_pred, model.accuracy,model.mean_xent],
                                       feed_dict = dict_adv)
       cur_corr_adv = acc_i*config['eval_batch_size']
       print(eval_batch_size)
@@ -109,6 +114,39 @@ def evaluate_checkpoint(filename):
       total_xent_adv += cur_xent_adv
       total_corr_nat += cur_corr_nat
       total_corr_adv += cur_corr_adv
+
+      check_idx = ~ np.equal(nat_voted_pred, y_batch) * np.equal(adv_voted_pred, y_batch)
+      check_dict['nat_img'] += [x_batch[check_idx]]
+      check_dict['adv_img'] += [x_batch_adv[check_idx]]
+      check_dict['nat_pred'] += [nat_voted_pred[check_idx]]
+      check_dict['adv_pred'] += [adv_voted_pred[check_idx]]
+      check_dict['nat_preds'] += [nat_prediction[check_idx]]
+      check_dict['adv_preds'] += [adv_prediction[check_idx]]
+      check_dict['label'] += [y_batch[check_idx]]
+      check_dict['ckeck_idx'] += [check_idx]
+
+    check_dict['nat_img'] = np.concatenate(check_dict['nat_img'], 0)
+    check_dict['adv_img'] = np.concatenate(check_dict['adv_img'], 0)
+    check_dict['nat_pred'] = np.concatenate(check_dict['nat_pred'], 0)
+    check_dict['adv_pred'] = np.concatenate(check_dict['adv_pred'], 0)
+    check_dict['nat_preds'] = np.concatenate(check_dict['nat_preds'], 0)
+    check_dict['adv_preds'] = np.concatenate(check_dict['adv_preds'], 0)
+    check_dict['label'] = np.concatenate(check_dict['label'], 0)
+    check_dict['ckeck_idx'] = np.concatenate(check_dict['ckeck_idx'], 0)
+
+    if 1:
+        import matplotlib.pyplot as plt
+        jj = 20
+        plt.figure(figsize=(8.8, 2))
+        for idx in range(10):
+            plt.subplot(2, 10, idx + 1)
+            plt.imshow(check_dict['nat_img'][jj + idx])
+            plt.title('{}'.format(check_dict['nat_preds'][jj + idx]))
+            plt.axis('off')
+            plt.subplot(2, 10, idx + 1 + 10)
+            plt.imshow(check_dict['adv_img'][jj + idx])
+            plt.title('{}'.format(check_dict['adv_preds'][jj + idx]))
+            plt.axis('off')
 
     avg_xent_nat = total_xent_nat / num_eval_examples
     avg_xent_adv = total_xent_adv / num_eval_examples
@@ -129,35 +167,5 @@ def evaluate_checkpoint(filename):
     print('avg nat loss: {:.4f}'.format(avg_xent_nat))
     print('avg adv loss: {:.4f}'.format(avg_xent_adv))
 
-# Infinite eval loop
-while True:
-  cur_checkpoint = tf.train.latest_checkpoint(model_dir)
-
-  # Case 1: No checkpoint yet
-  if cur_checkpoint is None:
-    if not already_seen_state:
-      print('No checkpoint yet, waiting ...', end='')
-      already_seen_state = True
-    else:
-      print('.', end='')
-    sys.stdout.flush()
-    time.sleep(10)
-  # Case 2: Previously unseen checkpoint
-  elif cur_checkpoint != last_checkpoint_filename:
-    print('\nCheckpoint {}, evaluating ...   ({})'.format(cur_checkpoint,
-                                                          datetime.now()))
-    sys.stdout.flush()
-    last_checkpoint_filename = cur_checkpoint
-    already_seen_state = False
-    evaluate_checkpoint(cur_checkpoint)
-  # Case 3: Previously evaluated checkpoint
-  else:
-    if not already_seen_state:
-      print('Waiting for the next checkpoint ...   ({})   '.format(
-            datetime.now()),
-            end='')
-      already_seen_state = True
-    else:
-      print('.', end='')
-    sys.stdout.flush()
-    time.sleep(10)
+if __name__ == '__main__':
+    evaluate_checkpoint('/home/hope-yao/Documents/adversarial_defense/cifar/ckpt/crop_4_20_adv/half_half/lr_config1_adv/checkpoint-25001')
