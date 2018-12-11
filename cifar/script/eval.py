@@ -56,7 +56,7 @@ summary_writer = tf.summary.FileWriter(eval_dir)
 
 # A function for evaluating a single checkpoint
 def evaluate_checkpoint(filename):
-  filename = '/home/hope-yao/Documents/adversarial_defense/cifar/ckpt/crop_4_20_adv/half_half/lr_config1_adv/checkpoint-25001'
+  #filename = '/home/hope-yao/Documents/adversarial_defense/cifar/ckpt/crop_4_20_adv/half_half/lr_config1_adv/checkpoint-25001'
   FLAGS = tf.app.flags.FLAGS
   tfconfig = tf.ConfigProto(
       allow_soft_placement=True,
@@ -86,7 +86,7 @@ def evaluate_checkpoint(filename):
       dict_nat = {model.x_input: x_batch,
                   model.y_input: y_batch}
 
-      if 0:
+      if 1:
           x_batch_adv = attack.perturb(x_batch, y_batch, sess)
       else:
           x_batch_adv = get_PGD(sess, model.adv_grad, model.x_input, model.y_input, x_batch, y_batch, epsilon=8. / 255, a=2. / 255, k=7)

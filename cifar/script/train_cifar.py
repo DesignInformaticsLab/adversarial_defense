@@ -59,10 +59,14 @@ if not os.path.exists(model_dir):
 # - eval of different runs
 
 saver = tf.train.Saver(max_to_keep=30)
+tf.summary.scalar('accuracy nat train', model.accuracy)
+tf.summary.scalar('xent nat train', model.mean_xent)
+tf.summary.image('images nat train', model.x_input)
+merged_summaries_nat = tf.summary.merge_all()
 tf.summary.scalar('accuracy adv train', model.accuracy)
 tf.summary.scalar('xent adv train', model.mean_xent)
 tf.summary.image('images adv train', model.x_input)
-merged_summaries = tf.summary.merge_all()
+merged_summaries_adv = tf.summary.merge_all()
 
 # keep the configuration file with the model for reproducibility
 shutil.copy('config.json', model_dir)
@@ -89,13 +93,13 @@ with tf.Session() as sess:#config=tfconfig
   training_time = 0.0
   for ii in range(max_num_training_steps):
     start = timer()
-    x_batch, y_batch = cifar.train_data.get_next_batch(batch_size//2, multiple_passes=True)
+    x_batch, y_batch = cifar.train_data.get_next_batch(batch_size, multiple_passes=True)
     x_batch = np.asarray(x_batch, 'float32') / 255.
 
-    nat_dict = {model.x_input: x_batch.reshape(batch_size//2, 32, 32, 3),
+    nat_dict = {model.x_input: x_batch.reshape(batch_size, 32, 32, 3),
                       model.y_input: y_batch}
     x_batch_adv = get_PGD(sess, model.adv_grad, model.x_input, model.y_input, x_batch, y_batch, epsilon=8. / 255, a=2. / 255, k=7)
-    adv_dict = {model.x_input: x_batch_adv.reshape(batch_size//2, 32, 32, 3),
+    adv_dict = {model.x_input: x_batch_adv.reshape(batch_size, 32, 32, 3),
                       model.y_input: y_batch}
     # x_batch_adv = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=8. / 255, a=2. / 255, k=7)
     # x_batch_adv_near = get_PGD(sess, model.adv_grad, nat_dict, model.x_input, epsilon=1. / 255, a=0.5 / 255, k=3)
@@ -118,8 +122,11 @@ with tf.Session() as sess:#config=tfconfig
         training_time = 0.0
     # Tensorboard summaries
     if ii % num_summary_steps == 0:
-      summary = sess.run(merged_summaries, feed_dict=adv_dict)
+      summary = sess.run(merged_summaries_adv, feed_dict=adv_dict)
       summary_writer.add_summary(summary, model.global_step.eval(sess))
+      summary = sess.run(merged_summaries_nat, feed_dict=nat_dict)
+      summary_writer.add_summary(summary, model.global_step.eval(sess))
+
 
     # Write a checkpoint
     if ii % num_checkpoint_steps == 0:
