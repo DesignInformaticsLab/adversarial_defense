@@ -21,7 +21,9 @@ class Model(object):
     self.y_input = tf.placeholder(tf.int64, shape=None)
     self.config = config
     self.y_pred = []
-    self.loc = [[14, 14], [14, 18], [18, 14], [18, 18]]
+    # self.loc = [[14, 14], [14, 18], [18, 14], [18, 18]]
+    # self.loc = [[12, 12], [12, 20], [20, 12], [20, 20]]
+    self.loc = [[12, 12], [12, 16], [12, 20], [16, 12], [16, 20], [20, 12], [20, 16], [20, 20]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -45,7 +47,7 @@ class Model(object):
             with tf.device('/gpu:%d' % gpu_i):
 
                 loc_x, loc_y = self.loc[ii]
-                x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
+                x_crop_i = self.x_input[:, loc_x - 12:loc_x + 12, loc_y - 12:loc_y + 12, :]
                 pre_softmax = self._build_model(x_crop_i)
 
                 # reuse variables

@@ -25,7 +25,6 @@ from pgd_multiGPU import *
 # Global constants
 with open('config.json') as config_file:
   config = json.load(config_file)
-num_eval_examples = config['num_eval_examples']
 eval_batch_size = config['eval_batch_size']
 eval_on_cpu = config['eval_on_cpu']
 data_path = config['data_path']
@@ -52,10 +51,12 @@ last_checkpoint_filename = ''
 already_seen_state = False
 
 saver = tf.train.Saver()
-summary_writer = tf.summary.FileWriter(eval_dir)
+summary_writer_eval = tf.summary.FileWriter(eval_dir)
+summary_writer_train = tf.summary.FileWriter(model_dir)
+input_data_eval = cifar.eval_data
+input_data_train = cifar.train_data
 
-# A function for evaluating a single checkpoint
-def evaluate_checkpoint(filename):
+def evaluate_checkpoint(filename, input_data, summary_writer):
   #filename = '/home/hope-yao/Documents/adversarial_defense/cifar/ckpt/crop_4_20_adv/half_half/lr_config1_adv/checkpoint-25001'
   FLAGS = tf.app.flags.FLAGS
   tfconfig = tf.ConfigProto(
@@ -67,7 +68,7 @@ def evaluate_checkpoint(filename):
 
     # Restore the checkpoint
     saver.restore(sess, filename)
-
+    num_eval_examples = input_data.ys.shape[0]
     # Iterate over the samples batch-by-batch
     num_batches = int(math.ceil(num_eval_examples / eval_batch_size))
     total_xent_nat = 0.
@@ -79,9 +80,9 @@ def evaluate_checkpoint(filename):
       bstart = ibatch * eval_batch_size
       bend = min(bstart + eval_batch_size, num_eval_examples)
 
-      x_batch = cifar.eval_data.xs[bstart:bend, :]
+      x_batch = input_data.xs[bstart:bend, :]
       x_batch = np.asarray(x_batch, 'float32') / 255.
-      y_batch = cifar.eval_data.ys[bstart:bend]
+      y_batch = input_data.ys[bstart:bend]
 
       dict_nat = {model.x_input: x_batch,
                   model.y_input: y_batch}
@@ -116,10 +117,8 @@ def evaluate_checkpoint(filename):
     acc_adv = total_corr_adv / num_eval_examples
 
     summary = tf.Summary(value=[
-          tf.Summary.Value(tag='xent adv eval', simple_value= avg_xent_adv),
           tf.Summary.Value(tag='xent adv', simple_value= avg_xent_adv),
           tf.Summary.Value(tag='xent nat', simple_value= avg_xent_nat),
-          tf.Summary.Value(tag='accuracy adv eval', simple_value= acc_adv),
           tf.Summary.Value(tag='accuracy adv', simple_value= acc_adv),
           tf.Summary.Value(tag='accuracy nat', simple_value= acc_nat)])
     summary_writer.add_summary(summary, global_step.eval(sess))
@@ -149,7 +148,8 @@ while True:
     sys.stdout.flush()
     last_checkpoint_filename = cur_checkpoint
     already_seen_state = False
-    evaluate_checkpoint(cur_checkpoint)
+    evaluate_checkpoint(cur_checkpoint, input_data_train, summary_writer_train)
+    evaluate_checkpoint(cur_checkpoint, input_data_eval, summary_writer_eval)
   # Case 3: Previously evaluated checkpoint
   else:
     if not already_seen_state:

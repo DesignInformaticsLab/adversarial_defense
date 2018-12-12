@@ -29,7 +29,7 @@ np.random.seed(config['np_random_seed'])
 # Setting up training parameters
 max_num_training_steps = config['max_num_training_steps']
 num_output_steps = config['num_output_steps']
-num_summary_steps = config['num_summary_steps']
+# num_summary_steps = config['num_summary_steps']
 num_checkpoint_steps = config['num_checkpoint_steps']
 data_path = config['data_path']
 batch_size = config['training_batch_size']
@@ -59,14 +59,6 @@ if not os.path.exists(model_dir):
 # - eval of different runs
 
 saver = tf.train.Saver(max_to_keep=30)
-tf.summary.scalar('accuracy nat train', model.accuracy)
-tf.summary.scalar('xent nat train', model.mean_xent)
-tf.summary.image('images nat train', model.x_input)
-merged_summaries_nat = tf.summary.merge_all()
-tf.summary.scalar('accuracy adv train', model.accuracy)
-tf.summary.scalar('xent adv train', model.mean_xent)
-tf.summary.image('images adv train', model.x_input)
-merged_summaries_adv = tf.summary.merge_all()
 
 # keep the configuration file with the model for reproducibility
 shutil.copy('config.json', model_dir)
@@ -83,7 +75,6 @@ with tf.Session() as sess:#config=tfconfig
   cifar = cifar10_input.AugmentedCIFAR10Data(raw_cifar, sess, model)
 
   # Initialize the summary writer, global variables, and our time counter.
-  summary_writer = tf.summary.FileWriter(model_dir, sess.graph)
   sess.run(tf.global_variables_initializer())
   training_time = 0.0
 
@@ -120,12 +111,13 @@ with tf.Session() as sess:#config=tfconfig
         print('    training adv accuracy {:.4}%'.format(np.mean(adv_acc) * 100))
         print('    {} samples per second'.format(num_output_steps * batch_size / training_time))
         training_time = 0.0
-    # Tensorboard summaries
-    if ii % num_summary_steps == 0:
-      summary = sess.run(merged_summaries_adv, feed_dict=adv_dict)
-      summary_writer.add_summary(summary, model.global_step.eval(sess))
-      summary = sess.run(merged_summaries_nat, feed_dict=nat_dict)
-      summary_writer.add_summary(summary, model.global_step.eval(sess))
+
+    # # Tensorboard summaries
+    # if ii % num_summary_steps == 0:
+    #   summary = sess.run(merged_summaries_adv, feed_dict=adv_dict)
+    #   summary_writer.add_summary(summary, model.global_step.eval(sess))
+    #   summary = sess.run(merged_summaries_nat, feed_dict=nat_dict)
+    #   summary_writer.add_summary(summary, model.global_step.eval(sess))
 
 
     # Write a checkpoint
