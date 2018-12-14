@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 import copy
 
-def get_PGD(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon=0.1, a=0.002, k=50, rand=False, dist='Linf'):
+def get_PGD(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon=0.1, a=0.002, k=50, rand=True, dist='Linf'):
   if dist == 'Linf':
     x = get_PGD_Linf(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, a, k, rand)
   elif dist == 'L2':

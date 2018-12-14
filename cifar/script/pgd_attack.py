@@ -21,7 +21,7 @@ class LinfPGDAttack:
     self.epsilon = epsilon
     self.num_steps = num_steps
     self.step_size = step_size
-    self.rand = False
+    self.rand = random_start
 
     if loss_func == 'xent':
       loss = model.xent

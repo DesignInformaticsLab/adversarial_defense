@@ -23,7 +23,8 @@ class Model(object):
     self.y_pred = []
     # self.loc = [[14, 14], [14, 18], [18, 14], [18, 18]]
     # self.loc = [[12, 12], [12, 20], [20, 12], [20, 20]]
-    self.loc = [[12, 12], [12, 16], [12, 20], [16, 12], [16, 20], [20, 12], [20, 16], [20, 20]]
+    # self.loc = [[12, 12], [12, 16], [12, 20], [16, 12], [16, 20], [20, 12], [20, 16], [20, 20]]
+    self.loc = [[14, 14], [14, 16], [14, 18], [16, 14], [16, 18], [18, 14], [18, 16], [18, 18]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -44,10 +45,11 @@ class Model(object):
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for ii in xrange(len(self.loc)):
             gpu_i=ii if mode == 'train' else 0
-            with tf.device('/gpu:%d' % gpu_i):
+            with tf.device('/gpu:%d' % gpu_i):#tf.device('/cpu'):#
 
                 loc_x, loc_y = self.loc[ii]
-                x_crop_i = self.x_input[:, loc_x - 12:loc_x + 12, loc_y - 12:loc_y + 12, :]
+                # x_crop_i = self.x_input[:, loc_x - 12:loc_x + 12, loc_y - 12:loc_y + 12, :]
+                x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
                 pre_softmax = self._build_model(x_crop_i)
 
                 # reuse variables
