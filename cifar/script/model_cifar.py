@@ -25,6 +25,7 @@ class Model(object):
     # self.loc = [[12, 12], [12, 20], [20, 12], [20, 20]]
     # self.loc = [[12, 12], [12, 16], [12, 20], [16, 12], [16, 20], [20, 12], [20, 16], [20, 20]]
     self.loc = [[14, 14], [14, 16], [14, 18], [16, 14], [16, 18], [18, 14], [18, 16], [18, 18]]
+    # self.loc = [[14, 14], [14, 16]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -40,7 +41,6 @@ class Model(object):
     self.x_crop = []
     self.pre_softmax = []
     self.adv_grads = []
-    self.adv_grad = tf.zeros_like(self.x_input)
 
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for ii in xrange(len(self.loc)):
@@ -55,7 +55,7 @@ class Model(object):
                 tf.get_variable_scope().reuse_variables()
                 batchnorm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=vscope)
 
-    self.crop_prediction = tf.argmax(self.pre_softmax, 1)
+    self.crop_prediction = tf.argmax(self.pre_softmax, 2)
     self.mean_softmax = tf.reduce_mean(self.pre_softmax, 0)
     epsilon = 1e-7
     self.mean_softmax = tf.clip_by_value(self.mean_softmax, epsilon, 1 - epsilon)
@@ -69,10 +69,13 @@ class Model(object):
         for ii in xrange(len(self.loc)):
             gpu_i=ii if mode == 'train' else 0
             with tf.device('/gpu:%d' % gpu_i):#tf.device('/cpu'):#
-                self.adv_grads += [tf.gradients(self.xent, self.x_input)[0]]
                 loc_x, loc_y = self.loc[ii]
-                self.adv_grad += self.adv_grads[-1]
+                padding = tf.constant([[0, 0], [loc_x - 14, 32 - loc_x - 14], [loc_y - 14, 32 - loc_y - 14], [0, 0]])
+                self.adv_grad_i_pre_pad = tf.gradients(self.xent, self.x_crop[ii])[0]
+                self.adv_grad_i = tf.pad(self.adv_grad_i_pre_pad, padding)
+                self.adv_grads += [self.adv_grad_i]
                 tf.get_variable_scope().reuse_variables()
+    self.adv_grad = tf.reduce_mean(self.adv_grads)
 
     total_loss = tf.reduce_mean(self.xent) + weight_decay * tf.reduce_mean(self._decay())
     self.grad = self.opts.compute_gradients(total_loss)
