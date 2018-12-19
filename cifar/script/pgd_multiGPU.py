@@ -35,7 +35,6 @@ def get_PGD_Linf(sess, adv_grad, x_input_pl, y_input_pl, x_nat, y_nat, epsilon, 
     grad = sess.run(adv_grad, feed_dict={x_input_pl: x, y_input_pl: y_nat})
     #print(grad.shape)
     # x += a * np.sign(grad)
-    print(x.shape, grad.shape)
     x = np.add(x, a * np.sign(grad), out=x, casting='unsafe')
     x = np.clip(x, x_nat - epsilon, x_nat + epsilon)
     x = np.clip(x, 0, 1)  # ensure valid pixel range

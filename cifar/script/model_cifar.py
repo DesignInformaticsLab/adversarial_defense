@@ -25,7 +25,7 @@ class Model(object):
     # self.loc = [[12, 12], [12, 20], [20, 12], [20, 20]]
     # self.loc = [[12, 12], [12, 16], [12, 20], [16, 12], [16, 20], [20, 12], [20, 16], [20, 20]]
     self.loc = [[14, 14], [14, 16], [14, 18], [16, 14], [16, 18], [18, 14], [18, 16], [18, 18]]
-    # self.loc = [[14, 14], [14, 16]]
+    # self.loc = [[14, 14]]
 
     # Setting up the optimizer
     step_size_schedule = config['step_size_schedule']
@@ -40,6 +40,7 @@ class Model(object):
 
     self.x_crop = []
     self.pre_softmax = []
+    self.softmax = []
     self.adv_grads = []
 
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
@@ -50,19 +51,25 @@ class Model(object):
                 #x_crop_i = self.x_input[:, loc_x - 12:loc_x + 12, loc_y - 12:loc_y + 12, :]
                 self.x_crop += [self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]]
                 self.pre_softmax += [self._build_model(self.x_crop[-1])]
-
+                self.softmax += [tf.nn.softmax(self.pre_softmax[-1])]
                 # reuse variables
                 tf.get_variable_scope().reuse_variables()
                 batchnorm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=vscope)
 
     self.crop_prediction = tf.argmax(self.pre_softmax, 2)
-    self.mean_softmax = tf.reduce_mean(self.pre_softmax, 0)
+    self.mean_softmax = tf.reduce_mean(self.softmax, 0)
     epsilon = 1e-7
     self.mean_softmax = tf.clip_by_value(self.mean_softmax, epsilon, 1 - epsilon)
     self.y_pred = tf.argmax(self.mean_softmax,1)
     self.pre_mean_softmax = tf.log(self.mean_softmax)
-    self.xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_mean_softmax)
     self.prediction = tf.argmax(self.pre_mean_softmax, 1)
+    self.xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=self.pre_mean_softmax)
+
+    total_loss = tf.reduce_mean(self.xent) + weight_decay * tf.reduce_mean(self._decay())
+    self.grad = self.opts.compute_gradients(total_loss)
+    update_network_op =  self.opts.apply_gradients(self.grad,global_step=self.global_step)
+    update_batchnorm_op = tf.group(*batchnorm_updates)
+    self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
     # adversarial gradient per mini-batch
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
@@ -77,12 +84,6 @@ class Model(object):
                 tf.get_variable_scope().reuse_variables()
     self.adv_grad = tf.reduce_mean(self.adv_grads)
 
-    total_loss = tf.reduce_mean(self.xent) + weight_decay * tf.reduce_mean(self._decay())
-    self.grad = self.opts.compute_gradients(total_loss)
-    self.grads = self.opts.compute_gradients(self.xent)
-    update_network_op =  self.opts.apply_gradients(self.grads,global_step=self.global_step)
-    update_batchnorm_op = tf.group(*batchnorm_updates)
-    self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
     if 0:
         self.adv_grad = tf.reduce_sum(self.adv_grads,0)

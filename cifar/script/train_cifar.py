@@ -81,6 +81,8 @@ with tf.Session() as sess:#config=tfconfig
   # Main training loop
   nat_acc = []
   adv_acc = []
+  nat_xent = []
+  adv_xent = []
   training_time = 0.0
   for ii in range(max_num_training_steps):
     start = timer()
@@ -102,6 +104,8 @@ with tf.Session() as sess:#config=tfconfig
     nat_acc_i, nat_xent_i = sess.run([model.accuracy, model.xent], feed_dict=nat_dict)
     nat_acc += [nat_acc_i]
     adv_acc += [adv_acc_i]
+    adv_xent += [adv_xent_i]
+    nat_xent += [nat_xent_i]
     end = timer()
     training_time += end - start
 
@@ -109,6 +113,8 @@ with tf.Session() as sess:#config=tfconfig
         print('Step {}:    ({})'.format(ii, datetime.now()))
         print('    training nat accuracy {:.4}%'.format(np.mean(nat_acc) * 100))
         print('    training adv accuracy {:.4}%'.format(np.mean(adv_acc) * 100))
+        print('    training nat xent {:.4} '.format(np.mean(nat_xent) ))
+        print('    training adv xent {:.4} '.format(np.mean(adv_xent) ))
         print('    {} samples per second'.format(num_output_steps * batch_size / training_time))
         training_time = 0.0
 
@@ -121,10 +127,10 @@ with tf.Session() as sess:#config=tfconfig
 
 
     # Write a checkpoint
-    if ii % num_checkpoint_steps == 0:
-      saver.save(sess,
-                 os.path.join(model_dir, 'checkpoint'),
-                 global_step=model.global_step)
+    # if ii % num_checkpoint_steps == 0:
+    #   saver.save(sess,
+    #              os.path.join(model_dir, 'checkpoint'),
+    #              global_step=model.global_step)
 
     if 0:
         # history replay
