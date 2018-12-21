@@ -43,6 +43,7 @@ class Model(object):
     self.adv_grads = []
     
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
+        softmax = []
         for ii in xrange(len(self.loc)):
             gpu_i=ii if mode == 'train' else 0
             with tf.device('/gpu:%d' % gpu_i):#tf.device('/cpu'):#
@@ -51,6 +52,7 @@ class Model(object):
                 # x_crop_i = self.x_input[:, loc_x - 12:loc_x + 12, loc_y - 12:loc_y + 12, :]
                 x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
                 pre_softmax = self._build_model(x_crop_i)
+                softmax += [tf.nn.softmax(pre_softmax)]
 
                 # reuse variables
                 tf.get_variable_scope().reuse_variables()
@@ -80,13 +82,16 @@ class Model(object):
     self.train_step = tf.group(update_network_op, update_batchnorm_op)
 
     self.adv_grad = tf.reduce_sum(self.adv_grads,0)
-    self.voted_pred = []
-    batch_size = config['training_batch_size'] if mode == "train" else config['eval_batch_size']
-    for i in range(batch_size) :  # loop over a batch
-        y, idx, count = tf.unique_with_counts(self.prediction[i])
-        majority = tf.argmax(count)
-        self.voted_pred += [tf.gather(y, majority)]
-    self.voted_pred = tf.stack(self.voted_pred)
+    if 0:
+        self.voted_pred = []
+        batch_size = config['training_batch_size'] if mode == "train" else config['eval_batch_size']
+        for i in range(batch_size) :  # loop over a batch
+            y, idx, count = tf.unique_with_counts(self.prediction[i])
+            majority = tf.argmax(count)
+            self.voted_pred += [tf.gather(y, majority)]
+        self.voted_pred = tf.stack(self.voted_pred)
+    else:
+        self.voted_pred = tf.argmax(tf.reduce_mean(softmax, 0), 1)
     self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
 
     self.vars = tf.trainable_variables()
