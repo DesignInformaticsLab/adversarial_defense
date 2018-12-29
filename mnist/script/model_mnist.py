@@ -83,11 +83,17 @@ class Model_crop():
     def __init__(self, x, y, idx=None):
         self.x_input = x
         self.y_input = y
-
+        softmax = []
         self.x_voting = []
         self.x_crop = []
         self.pre_softmax = []
-        loc = [[10, 10], [10, 14], [10, 18], [14, 10], [14, 14], [14, 18], [18, 10], [18, 14], [18, 18]]
+        # loc = [[10, 10], [10, 14], [10, 18], [14, 10], [14, 14], [14, 18], [18, 10], [18, 14], [18, 18]]
+        # loc = [[6, 6], [6, 14], [6, 22], [14, 6], [14, 14], [14, 22], [22, 6], [22, 14], [22, 22]]
+        # loc = [[8, 8], [8, 14], [8, 20], [14, 8], [14, 14], [14, 20], [20, 8], [20, 14], [20, 20]]
+        # loc = [[12, 12], [12, 14], [12, 16], [14, 12], [14, 14], [14, 16], [16, 12], [16, 14], [16, 16]]
+
+        loc = [10,12,13,14,16,18]
+        loc = [(i, j) for i in loc for j in loc]
         if idx!=None:
             loc = loc[idx:idx+1]
         self.xent = []
@@ -107,6 +113,7 @@ class Model_crop():
                 x = slim.fully_connected(x, num_outputs=1024, scope='fc1')
                 pre_softmax = slim.fully_connected(x, num_outputs=10, activation_fn=None, scope='fc2')
                 self.pre_softmax += [pre_softmax]
+                softmax += [tf.nn.softmax(pre_softmax)]
                 self.y_pred += [tf.argmax(pre_softmax, 1)]
                 y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=pre_softmax)
                 self.xent += [y_xent]
@@ -117,6 +124,69 @@ class Model_crop():
             self.xent_indv = self.xent
             self.xent = tf.reduce_mean(self.xent)
             self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='classifier')
+
+            self.voted_pred = tf.argmax(tf.reduce_mean(softmax, 0), 1)
+            self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
+
+
+class Model_crop_cosine():
+    def __init__(self, x, y, idx=None):
+        self.x_input = x
+        self.y_input = y
+        softmax = []
+        self.x_voting = []
+        self.x_crop = []
+        self.pre_softmax = []
+        # loc = [[10, 10], [10, 14], [10, 18], [14, 10], [14, 14], [14, 18], [18, 10], [18, 14], [18, 18]]
+        # loc = [[6, 6], [6, 14], [6, 22], [14, 6], [14, 14], [14, 22], [22, 6], [22, 14], [22, 22]]
+        # loc = [[8, 8], [8, 14], [8, 20], [14, 8], [14, 14], [14, 20], [20, 8], [20, 14], [20, 20]]
+        # loc = [[12, 12], [12, 14], [12, 16], [14, 12], [14, 14], [14, 16], [16, 12], [16, 14], [16, 16]]
+        from cos_loss import cos_loss
+        loc = [10,14,18]
+        loc = [(i, j) for i in loc for j in loc]
+        if idx!=None:
+            loc = loc[idx:idx+1]
+        self.xent_indv = []
+        self.features = []
+        with tf.variable_scope('classifier') as scope:
+            self.y_pred = []
+            for i, loc_i in enumerate(loc):
+                # crop
+                loc_x, loc_y = loc_i
+                x_crop_i = self.x_input[:, loc_x-10:loc_x+10, loc_y-10:loc_y+10, :]
+                self.x_crop += [x_crop_i]
+                # x = slim.max_pool2d(x, kernel_size=2)
+                x = slim.conv2d(x_crop_i, kernel_size=5, num_outputs=32, scope='conv1')
+                x = slim.max_pool2d(x, kernel_size=2)
+                x = slim.conv2d(x, kernel_size=5, num_outputs=64, scope='conv2')
+                x = slim.max_pool2d(x, kernel_size=2)
+                x = slim.flatten(x, scope='flatten')
+                x = slim.fully_connected(x, num_outputs=1024, scope='fc1')
+                self.features += [x]
+                y_xent, logits, tmp = cos_loss(x, self.y_input, 10, alpha=0.25)
+                self.y_pred += [tf.arg_max(tf.matmul(tmp['x_feat_norm'], tmp['w_feat_norm']), 1)]
+                '''
+                pre_softmax = slim.fully_connected(x, num_outputs=10, activation_fn=None, scope='fc2')
+                self.pre_softmax += [pre_softmax]
+                softmax += [tf.nn.softmax(pre_softmax)]
+                self.y_pred += [tf.argmax(pre_softmax, 1)]
+                y_xent = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.y_input, logits=pre_softmax)
+                '''
+                self.xent_indv += [y_xent]
+                tf.get_variable_scope().reuse_variables()
+                assert tf.get_variable_scope().reuse == True
+            '''
+            self.pre_softmax = tf.reduce_mean(self.pre_softmax,0)
+            self.y_pred = tf.stack(self.y_pred)
+            self.xent_indv = self.xent
+            self.xent = tf.reduce_mean(self.xent)
+            '''
+            self.xent, logits, tmp = cos_loss(tf.reduce_mean(self.features,0), self.y_input, 10, alpha=0.25)
+            self.vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='classifier')
+
+            #self.voted_pred = tf.argmax(tf.reduce_mean(softmax, 0), 1)
+            self.voted_pred = tf.arg_max(tf.matmul(tmp['x_feat_norm'], tmp['w_feat_norm']), 1)
+            self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, self.y_input), tf.float32))
 
 
 class Model_crop_presftmx():#
