@@ -1,2 +1,2 @@
-model_checkpoint_path: "crop_ckpt"
-all_model_checkpoint_paths: "crop_ckpt"
+model_checkpoint_path: "/home/hyao23/cos_loss_test/adversarial_defense/mnist/script/crop_ckpt_0.15"
+all_model_checkpoint_paths: "/home/hyao23/cos_loss_test/adversarial_defense/mnist/script/crop_ckpt_0.15"

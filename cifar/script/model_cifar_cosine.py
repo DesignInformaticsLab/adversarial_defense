@@ -17,8 +17,8 @@ class Model(object):
       mode: One of 'train' and 'eval'.
     """
     self.mode = mode
-    self.x_input = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
-    self.y_input = tf.placeholder(tf.int64, shape=None)
+    self.x_input = tf.placeholder(tf.float32, shape=[80, 32, 32, 3])
+    self.y_input = tf.placeholder(tf.int64, shape=80)
     self.config = config
     self.y_pred = []
     # self.loc = [[14, 14], [14, 18], [18, 14], [18, 18]]
@@ -36,7 +36,6 @@ class Model(object):
     self.global_step = tf.contrib.framework.get_or_create_global_step()
     learning_rate = tf.train.piecewise_constant(tf.cast(self.global_step, tf.int32), boundaries, values)
     self.opts = tf.train.MomentumOptimizer(learning_rate,momentum)
-
     self.features = []
     xent = []
     self.prediction = []
@@ -45,11 +44,13 @@ class Model(object):
     self.accuracy = []
     from cos_loss import cos_loss
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        for batch_i in range(2): # 8 GPU maximum
+        w = tf.get_variable("centers", [640,10], dtype=tf.float32,
+                            initializer=tf.contrib.layers.xavier_initializer(), trainable=True)
+        for batch_i in range(8): # 8 GPU maximum
             gpu_i = batch_i
             x_input_batch_i = self.x_input[10*batch_i:10*(batch_i+1)]
             y_input_batch_i = self.y_input[10*batch_i:10*(batch_i+1)]
-            if mode == 'train': gpu_i=0
+            if mode != 'train': gpu_i=0
             with tf.device('/gpu:%d' % gpu_i):#tf.device('/cpu'):#
                 for ii in xrange(len(self.loc)):
                     loc_x, loc_y = self.loc[ii]
@@ -57,27 +58,26 @@ class Model(object):
                     #x_crop_i = self.x_input[:, loc_x - 14:loc_x + 14, loc_y - 14:loc_y + 14, :]
                     feature_i = self._build_model(x_crop_i)
                     self.features += [feature_i]
+                    #y_xent, logits, tmp = cos_loss(feature_i, y_input_batch_i, 10, reuse=reuse, alpha=0.25)
+                    #self.prediction += [tf.arg_max(tf.matmul(tmp['x_feat_norm'], tmp['w_feat_norm']), 1)]
+                    #xent += [y_xent]
 
-                    y_xent, logits, tmp = cos_loss(feature_i, y_input_batch_i, 10, alpha=0.25)
-                    self.prediction += [tf.arg_max(tf.matmul(tmp['x_feat_norm'], tmp['w_feat_norm']), 1)]
-                    xent += [y_xent]
-
-                    # reuse variables
                     tf.get_variable_scope().reuse_variables()
 
-                self.xent, logits, tmp = cos_loss(tf.reduce_mean(self.features, 0), y_input_batch_i, 10, alpha=0.25)
+                self.xent, logits, tmp = cos_loss(tf.reduce_mean(self.features, 0), y_input_batch_i, w, alpha=0.1)
                 self.voted_pred = tf.arg_max(tf.matmul(tmp['x_feat_norm'], tmp['w_feat_norm']), 1)
                 self.accuracy += [tf.reduce_mean(tf.cast(tf.equal(self.voted_pred, y_input_batch_i), tf.float32))]
 
                 batchnorm_updates = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope=vscope)
-                total_loss = tf.reduce_mean(xent) + weight_decay * tf.reduce_mean(self._decay())
+                total_loss = tf.reduce_mean(self.xent) + weight_decay * tf.reduce_mean(self._decay())
                 # training gradient per mini-batch
                 grad_i = self.opts.compute_gradients(total_loss)
                 tower_grads += [grad_i]
 
                 # adversarial gradient per mini-batch
-                adv_grad_i = tf.gradients(tf.reduce_sum(self.xent), self.x_input)[0]
+                adv_grad_i = tf.gradients(tf.reduce_sum(self.xent), x_input_batch_i)[0]
                 self.adv_grads += [adv_grad_i]
+                tf.get_variable_scope().reuse_variables()
 
     update_batchnorm_op = tf.group(*batchnorm_updates)
     self.grads = average_gradients(tower_grads)

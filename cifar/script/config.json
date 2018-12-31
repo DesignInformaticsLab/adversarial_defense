@@ -11,13 +11,13 @@
   "max_num_training_steps": 80000,
   "num_output_steps": 100,
   "num_checkpoint_steps": 500,
-  "training_batch_size": 100,
+  "training_batch_size": 80,
   "step_size_schedule": [[0, 0.1], [20000, 0.01], [40000, 0.001], [50000, 0.0001], [60000, 0.00001]],
   "weight_decay": 0.0002,
   "momentum": 0.9,
 
   "_comment": "===== EVAL CONFIGURATION =====",
-  "eval_batch_size": 20,
+  "eval_batch_size": 10,
   "eval_on_cpu": false,
 
   "_comment": "=====ADVERSARIAL EXAMPLES CONFIGURATION=====",

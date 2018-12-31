@@ -18,7 +18,7 @@ import numpy as np
 import tensorflow as tf
 
 import cifar10_input
-from model_cifar import Model
+from model_cifar_cosine import Model
 #from pgd_attack import LinfPGDAttack
 from pgd_multiGPU import *
 

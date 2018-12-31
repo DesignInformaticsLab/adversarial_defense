@@ -75,12 +75,12 @@ def coco_backward(op, grad):
 
 
 def coco_func(xw, y, m, name=None):
-    with tf.op_scope([xw, y, m], name, "Coco_func") as name:
-        coco_out = py_func(coco_forward, [xw, y, m], tf.float32, name=name, grad_func=coco_backward)
-        return coco_out
+    #with tf.op_scope([xw, y, m], name, "Coco_func") as name:
+    coco_out = py_func(coco_forward, [xw, y, m], tf.float32, name=name, grad_func=coco_backward)
+    return coco_out
 
 
-def cos_loss(x, y, num_cls, reuse=False, alpha=0.25, scale=64, name='cos_loss'):
+def cos_loss(x, y, w, alpha=0.25, scale=64, name='cos_loss'):
     '''
     x: B x D - features
     y: B x 1 - labels
@@ -90,9 +90,6 @@ def cos_loss(x, y, num_cls, reuse=False, alpha=0.25, scale=64, name='cos_loss'):
     '''
     # define the classifier weights
     xs = x.get_shape()
-    with tf.variable_scope('centers_var', reuse=reuse) as center_scope:
-        w = tf.get_variable("centers", [xs[1], num_cls], dtype=tf.float32,
-                            initializer=tf.contrib.layers.xavier_initializer(), trainable=True)
 
     # normalize the feature and weight
     # (N,D)
