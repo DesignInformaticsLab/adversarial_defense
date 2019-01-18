@@ -38,7 +38,7 @@ class LinfPGDAttack:
       print('Unknown loss function. Defaulting to cross-entropy')
       loss = model.xent
 
-    self.grads = [tf.gradients(tf.reduce_mean(model.xent[:, i]), model.x_input)[0] for i in range(4)]
+    #self.grads = [tf.gradients(tf.reduce_mean(model.xent[:, i]), model.x_input)[0] for i in range(4)]
     self.grad = tf.gradients(tf.reduce_sum(loss), model.x_input)[0]
 
   def perturb(self, x_nat, y, sess):

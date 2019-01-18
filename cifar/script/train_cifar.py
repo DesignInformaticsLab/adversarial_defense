@@ -14,7 +14,7 @@ from timeit import default_timer as timer
 import tensorflow as tf
 import numpy as np
 
-from model_cifar_cosine import Model
+from model_cifar import Model
 import cifar10_input
 # from pgd_attack import LinfPGDAttack
 from pgd_multiGPU import *

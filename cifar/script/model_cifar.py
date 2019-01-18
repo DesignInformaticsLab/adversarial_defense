@@ -73,6 +73,7 @@ class Model(object):
                 self.adv_grads += [adv_grad_i]
 
     self.xent = tf.stack(xent, 1)
+    self.y_xent = tf.reduce_mean(self.xent,0)
     self.mean_xent = tf.reduce_mean(self.xent)
     self.prediction = tf.stack(prediction, 1)
     update_batchnorm_op = tf.group(*batchnorm_updates)

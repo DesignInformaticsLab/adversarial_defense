@@ -87,7 +87,7 @@ class AugmentedCIFAR10Data(object):
         - sess: current tensorflow session
         - model: current model (needed for input tensor)
     """
-    def __init__(self, raw_cifar10data, sess, model):
+    def __init__(self, raw_cifar10data, sess, model=None):
         assert isinstance(raw_cifar10data, CIFAR10Data)
         self.image_size = 32
 
