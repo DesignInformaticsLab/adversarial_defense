@@ -80,7 +80,7 @@ def coco_func(xw, y, m, name=None):
         return coco_out
 
 
-def cos_loss(x, y, num_cls, reuse=False, alpha=0.25, scale=64, name='cos_loss'):
+def cos_loss(x, y, num_cls, reuse=False, alpha=0.15, scale=64, name='cos_loss'):
     '''
     x: B x D - features
     y: B x 1 - labels

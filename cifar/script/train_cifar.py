@@ -69,7 +69,7 @@ tfconfig = tf.ConfigProto(
     log_device_placement=True,
 )
 tfconfig.gpu_options.allow_growth = True
-with tf.Session() as sess:#config=tfconfig
+with tf.Session(config=tfconfig) as sess:#
 
   # initialize data augmentation
   cifar = cifar10_input.AugmentedCIFAR10Data(raw_cifar, sess, model)
